@@ -195,7 +195,9 @@ def menu_description(pl):
     def compose(shown):
         parts = lead + ([count(n) + "."] if grouped else [])
         for label, members in itertools.groupby(shown, key=lambda item: item[0]):
-            parts.append(f"{label}: " + ", ".join(m.replace("-", NB_HYPHEN) for _, m in members) + ".")
+            # The menu cannot show bold or line breaks, so capitals are what make a group's label findable.
+            heading = label.upper() if grouped else label
+            parts.append(f"{heading}: " + ", ".join(m.replace("-", NB_HYPHEN) for _, m in members) + ".")
         if len(shown) < n:
             parts.append(f"And {n - len(shown)} more.")
         return " ".join(parts)
