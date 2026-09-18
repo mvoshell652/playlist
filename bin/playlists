@@ -1,0 +1,12 @@
+#!/bin/sh
+# Finds a Python 3 and runs playlists.py. `python3` is missing on many Windows installs,
+# where the interpreter is `python` or the `py` launcher instead.
+dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+for py in python3 python py; do
+  if command -v "$py" >/dev/null 2>&1 && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 8))' >/dev/null 2>&1; then
+    exec "$py" "$dir/playlists.py" "$@"
+  fi
+done
+# The hook runs on every prompt and must stay silent; everything else explains itself.
+[ "$1" = "hook" ] || echo "Playlist error: Python 3.8 or newer was not found on PATH. Install it, then try again."
+exit 0
