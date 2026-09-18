@@ -1,6 +1,9 @@
 {
   "name": "skill-playlists",
-  "owner": { "name": "Matthew Voshell" },
+  "description": "Skill Playlists: save any set of Claude Code skills under one name and load them together.",
+  "owner": {
+    "name": "Matthew Voshell"
+  },
   "plugins": [
     {
       "name": "playlists",
