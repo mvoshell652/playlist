@@ -98,7 +98,7 @@ Question "What do you want to do with your playlists?", header "Action":
    | Rename it | Ask for the name as in Create step 1, then `rename <name> <new-name>`. End with the reload call-out from Create step 7, because the renamed playlist also needs `/reload-plugins` to reach the slash menu. |
    | Change description | Offer two short descriptions; they type their own under "Other", reduced as described above. Then `set <name> -d '<text>'`. |
 
-   Typed requests under "Other": "load only what a request needs" is `set <name> --mode pick`; "load every skill" is `set <name> --mode all`; "load it automatically when ..." is `set <name> --auto '<when>'` with the text reduced as described above, and `--no-auto` turns that off.
+   Typed requests under "Other": "share it with my team" is `share <name>`, which copies it into this repo to be committed; "load only what a request needs" is `set <name> --mode pick`; "load every skill" is `set <name> --mode all`; "load it automatically when ..." is `set <name> --auto '<when>'` with the text reduced as described above, and `--no-auto` turns that off.
 3. Show what the command printed. After adding or removing, that includes the new skill count, and the change is live in this session. Then ask once, header "Next": "Add skills", "Remove skills", "Done".
 
 ## Delete
@@ -109,7 +109,7 @@ Question "What do you want to do with your playlists?", header "Action":
 
 ## See my playlists
 
-Run `list` and show the result as a table. If they want to look inside one, run `show <name>`. If a skill shows as not found, run `doctor` and explain what it reports.
+Run `list` and show the result as a table. If they want to look inside one, run `show <name>`. If they ask to check their playlists, or a skill shows as not found, run `doctor` and explain what it reports.
 
 ## Playing a playlist from here
 
