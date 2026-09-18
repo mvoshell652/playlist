@@ -1,6 +1,6 @@
 {
   "name": "playlist",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Skill playlists. Type /playlist to create and edit them, and /playlist:<name> to load one.",
   "author": {
     "name": "Matthew Voshell"

@@ -32,6 +32,9 @@ NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 SKILL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$")
 CMD_RE = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
 MODES = ("all", "pick")
+# Words the /playlist menu acts on. A playlist with one of these names could not be told apart from the request.
+RESERVED = {"new", "create", "add", "remove", "edit", "set", "rename", "delete", "show", "list", "play",
+            "share", "suggest", "check", "help"}
 # The Agent Skills spec caps a description at 1,024 characters.
 DESCRIPTION_LIMIT = 1024
 # Skills the harness loads for its own purposes; nobody picks these, so they are noise in a mined playlist.
@@ -246,6 +249,9 @@ def render_skill(pl, index):
 def write_playlist(name, skills, description="", mode="all", auto_when="", project=False, cwd=None, folder=None):
     """Writes playlist.json and its SKILL.md. `folder` is given when editing, so an edit never changes scope."""
     check_name(name)
+    if folder is None and name in RESERVED:
+        raise PlaylistError(f"'{name}' is a word the /playlist menu uses, so it cannot be a playlist name. "
+                            f"Try '{name}-skills' or another name.")
     skills = check_skills(skills)
     if folder is None:
         root = project_plugin_root(cwd) if project else personal_root()
@@ -640,12 +646,24 @@ def cmd_set(a):
 def cmd_rename(a):
     pl = get_playlist(a.name)
     check_name(a.new_name)
+    if a.new_name in RESERVED:
+        raise PlaylistError(f"'{a.new_name}' is a word the /playlist menu uses, so it cannot be a playlist name.")
     if a.new_name in all_playlists():
         raise PlaylistError(f"Playlist '{a.new_name}' already exists.")
     write_playlist(a.new_name, pl["skills"], pl["description"], pl["mode"], pl["auto_when"],
                    folder=os.path.join(os.path.dirname(os.path.dirname(pl["path"])), a.new_name))
     remove_playlist(pl)
     print(f"Renamed '{pl['name']}' to '{a.new_name}'. " + MENU_NOTE.format(ns=NAMESPACE, name=a.new_name))
+
+
+def cmd_share(a):
+    """Copy a personal playlist into the current repo so it can be committed. The personal one stays."""
+    pl = get_playlist(a.name)
+    if pl["scope"] == "project":
+        raise PlaylistError(f"'{pl['name']}' already lives in this project: {os.path.dirname(pl['path'])}")
+    folder = write_playlist(pl["name"], pl["skills"], pl["description"], pl["mode"], pl["auto_when"], project=True)
+    print(f"Copied '{pl['name']}' ({count(len(pl['skills']))}) to {folder}\n"
+          f"Commit that folder to share it. In this project it now takes the place of your personal copy, which is unchanged.")
 
 
 def cmd_delete(a):
@@ -777,6 +795,9 @@ def main(argv=None):
     p.add_argument("name")
     p.add_argument("new_name")
     p.set_defaults(fn=cmd_rename)
+    p = sub.add_parser("share", help="copy a personal playlist into this repo's .claude/skills/playlist so it can be committed")
+    p.add_argument("name")
+    p.set_defaults(fn=cmd_share)
     p = sub.add_parser("delete", help="delete a playlist (never the skills in it)")
     p.add_argument("name")
     p.set_defaults(fn=cmd_delete)

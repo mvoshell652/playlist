@@ -245,6 +245,35 @@ class ManageTests(Sandbox):
         self.assertIn("name: fresh\n", self.skill_md("fresh", root))
         self.assertFalse(os.path.exists(os.path.join(root, "skills", "old")))
 
+    def test_share_copies_a_personal_playlist_into_the_repo_and_keeps_the_original(self):
+        self.run_cli("new", "kit", "a", "b", "-d", "Two things")
+        self.run_cli("set", "kit", "--mode", "pick")
+        out = self.run_cli("share", "kit")
+        root = os.path.join(self.repo, ".claude", "skills", "playlist")
+        self.assertIn("Commit that folder", out)
+        self.assertIn("Two things. 2 skills: a, b.", self.skill_md("kit", root))
+        self.assertIn("loaded <k> of 2 skills", self.skill_md("kit", root))  # settings travel with it
+        self.assertTrue(os.path.exists(os.path.join(self.home, "skills", "kit", "playlist.json")))
+        self.assertIn("already lives in this project", self.run_cli("share", "kit"))
+
+    def test_menu_words_cannot_be_playlist_names(self):
+        for word in ("new", "show", "delete", "share"):
+            self.assertIn("a word the /playlist menu uses", self.run_cli("new", word, "a"), word)
+        self.run_cli("new", "kit", "a")
+        self.assertIn("a word the /playlist menu uses", self.run_cli("rename", "kit", "list"))
+        self.assertIn("/playlist:kit", self.run_cli("list"))
+
+    def test_every_command_the_readme_documents_exists(self):
+        with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as fh:
+            readme = fh.read()
+        table = readme[readme.index("### Command line"):readme.index("### The playlist file")]
+        documented = set(re.findall(r"^\| `([a-z]+)", table, flags=re.M))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            pl.main(["--help"])
+        real = set(re.search(r"\{([a-z,-]+)\}", out.getvalue()).group(1).split(","))
+        self.assertEqual(documented, real)
+
     def test_new_refuses_to_overwrite_without_force(self):
         self.run_cli("new", "kit", "a")
         self.assertIn("already exists", self.run_cli("new", "kit", "b"))

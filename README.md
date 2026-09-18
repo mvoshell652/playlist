@@ -68,6 +68,112 @@ If you already know what you want, say it and the menu skips ahead:
 
 Adding or removing a skill takes effect in the current session. When you create a playlist, the menu ends by offering to **play it now**, which loads its skills into the conversation straight away. To see a new or renamed playlist in the `/` menu without waiting for your next session, type `/reload-plugins`; Claude Code reserves that command for you, so the tool cannot run it on your behalf.
 
+## Options
+
+### Ways to play a playlist
+
+| You type | What happens |
+|---|---|
+| `/playlist:swift` | Loads the playlist and stops, ready for your next message |
+| `/playlist:swift review LoginView` | Loads it, then carries out the request with those skills applied |
+| `/playlist swift review LoginView` | The same, through the menu command. This works for a playlist you created a moment ago, before it has reached the slash menu |
+| "Play it now" at the end of creating one | Loads the new playlist into the conversation straight away |
+
+### Settings for each playlist
+
+Every playlist has four settings. Change them from `/playlist`, then **Edit a playlist**, or say what you want in one line.
+
+| Setting | Values | What it does | Say this |
+|---|---|---|---|
+| Load mode | `all` (default) | Loads every skill, every time | `/playlist make swift load every skill` |
+| | `pick` | Lists each skill with its description and lets Claude load only the ones the request needs. Suits large playlists, and is the only mode that uses less context | `/playlist make swift load only what a request needs` |
+| Auto-load rule | off (default) | The playlist plays only when you call it, so many skills never load by surprise | `/playlist stop loading swift automatically` |
+| | a rule you write | Claude may load the playlist on its own when the rule applies | `/playlist load swift automatically when working on Swift code` |
+| Description | short text | Shown first in the hover text beside the playlist | `/playlist change the description of swift` |
+| Where it lives | personal (default) | `~/.claude/skills/playlist/`, available in every project | |
+| | project | `<repo>/.claude/skills/playlist/`, committed with the repo. Experimental, see below | `/playlist share swift with my team` |
+
+A playlist does not make skills cheaper. Loading 20 skills costs the same context whether you load them one by one or from a playlist. `pick` is the only setting that loads less.
+
+### Everything the menu understands
+
+Run `/playlist` alone for the guided steps, or add a request and it skips the steps you already answered.
+
+| You want to | Say |
+|---|---|
+| Create from skills you name | `/playlist new nuxt-app with nuxt vue pinia shadcn vitest a11y` |
+| Create from the skills loaded in this conversation | `/playlist save the skills I just used as review` |
+| Create from your project's stack | `/playlist`, then **Create**, then **Suggest for this project** |
+| Get ideas from your history | `/playlist suggest playlists from my history` |
+| Add or remove skills | `/playlist add swiftdata to swift`, `/playlist remove focusengine from swift` |
+| Rename or delete | `/playlist rename db to data`, `/playlist delete review` |
+| See what you have | `/playlist show my playlists`, `/playlist show swift` |
+| Check for renamed or uninstalled skills | `/playlist check my playlists` |
+
+Partial skill names are fine. Claude looks up the exact ids, picks the obvious match, marks the places where it chose between similar skills, and asks only when it cannot tell. Deleting always asks first and never removes the skills themselves.
+
+### Command line
+
+The menu calls a small command line tool, and you can use it directly:
+
+```
+sh ~/.claude/skills/playlist/bin/playlist <command>
+```
+
+| Command | What it does |
+|---|---|
+| `list` | Your playlists, with skill counts, location and load mode |
+| `show <playlist>` | The skills in one playlist, and whether each is installed |
+| `new <name> [skill ...]` | Create a playlist. `--session <id>` captures a conversation's skills, `--last N` limits that to its last N turns, `-d "text"` sets the description, `--mode all\|pick`, `--project` saves it in the current repo, `--force` replaces an existing one |
+| `add <playlist> <skill ...>` | Add skills. `--session <id>` adds everything loaded in a conversation |
+| `remove <playlist> <skill ...>` | Remove skills. It refuses to empty a playlist; delete it instead |
+| `set <playlist>` | `-d "text"`, `--mode all\|pick`, `--auto "when ..."`, `--no-auto` |
+| `rename <playlist> <new-name>` | Rename, keeping its skills and settings |
+| `share <playlist>` | Copy a personal playlist into the current repo so it can be committed. Your personal copy stays |
+| `delete <playlist>` | Delete the playlist. The skills stay installed |
+| `skills [word ...]` | Search your installed skills by word. `--limit N` |
+| `match <word ...>` | The best installed skills for several words in one pass. `--limit N` per word |
+| `loaded --session <id>` | The skills a conversation has loaded, without creating anything |
+| `suggest` | Sets of skills you repeatedly load in the same turn. `--min-support N` sets how often (default 3), `--dismiss N ...` hides suggestions for good, `--json` for scripts |
+| `doctor` | Checks every playlist for skills that are no longer installed and for hand-edited files |
+| `sync` | Regenerates every playlist's `SKILL.md` from its `playlist.json` |
+
+Playlist names use lowercase letters, digits, `-` and `_`, up to 48 characters. Words the menu acts on, such as `new`, `show` and `delete`, cannot be names. Skill ids are written exactly as Claude Code shows them, including a plugin prefix such as `supabase:supabase`.
+
+### The playlist file
+
+Each playlist is one folder with two files. `playlist.json` is the one to edit; `SKILL.md` is generated from it, so run `sync` after a hand edit.
+
+```json
+{
+  "name": "swift",
+  "description": "Full Swift and SwiftUI pass",
+  "mode": "all",
+  "auto_when": "",
+  "skills": ["swiftui-pro", "swift-concurrency", "supabase:supabase"]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `name` | For reference only. The folder name is what counts |
+| `description` | Short text shown first in the hover text. Flattened to one line |
+| `mode` | `all` or `pick` |
+| `auto_when` | Empty, or the rule that lets Claude load the playlist unasked |
+| `skills` | Skill ids in load order. Entries that are not shaped like a skill id are ignored, and `doctor` says how many |
+
+The hover text is built from these: the description, the skill count, then every skill, grouped under a capitalised label when three or more share a first word. Claude Code caps a description at 1,024 characters, so a very large playlist lists what fits and ends with "And N more."
+
+### Troubleshooting
+
+| What you see | What to do |
+|---|---|
+| A new or renamed playlist is missing from the `/` menu | Type `/reload-plugins`, or start a new session. Until then `/playlist <name>` plays it |
+| The hover text is out of date | The same. Claude Code reads it when plugins load |
+| A skill is reported as not loaded | Run `/playlist check my playlists`. The skill was probably renamed or uninstalled |
+| "not found on disk" beside a skill | Built-in skills and skills synced from claude.ai are never on disk, so this is normal for them. For anything else, check the spelling with `skills <word>` |
+| "Python 3.8 or newer was not found" | Install Python and make sure `python3`, `python` or `py` is on PATH |
+
 ## How it works
 
 The tool is a plugin that lives in your skills directory. Claude Code registers such a plugin's root skill under its bare name and the skills inside it as `name:skill`, which is what puts the menu at `/playlist` and each playlist at `/playlist:<name>`:
@@ -81,21 +187,7 @@ The tool is a plugin that lives in your skills directory. Claude Code registers 
   skills/swift/SKILL.md          /playlist:swift, generated from it
 ```
 
-```json
-{
-  "name": "swift",
-  "description": "Full Swift and SwiftUI pass",
-  "mode": "all",
-  "auto_when": "",
-  "skills": ["swiftui-pro", "swift-concurrency", "supabase:supabase"]
-}
-```
-
 A generated `SKILL.md` is static text that tells Claude which skills to load. Playing a playlist runs no command and needs no permission.
-
-- `mode: all` loads every skill. `mode: pick` lists each skill with its description and lets Claude load only what the request needs, which suits very large playlists.
-- A playlist only plays when you call it. You can let Claude load one on its own by giving it a rule such as "working on Swift code".
-- A playlist does not make skills cheaper. Loading 20 skills costs the same context either way; `pick` is the only mode that loads less.
 
 ### Share with a team (experimental)
 
