@@ -116,7 +116,7 @@ class SlashMenuTests(Sandbox):
     def test_menu_description_leads_with_purpose_and_reads_as_sentences(self):
         self.run_cli("new", "kit", "zeta", "alpha", "supabase:supabase", "-d", "Mixed stack")
         desc = pl.menu_description(pl.get_playlist("kit"))
-        self.assertEqual(desc, "Mixed stack. 3 skills: zeta, alpha, supabase:supabase.")
+        self.assertEqual(desc, "Mixed stack. 3 skills: zeta, alpha, supabase.")  # a plugin id says its name once
         for noise in ("Playlist", "\u00b7", "\u2022", "\n"):  # the menu already says (playlist); dots and breaks ran together
             self.assertNotIn(noise, desc)
 
@@ -127,6 +127,11 @@ class SlashMenuTests(Sandbox):
         self.assertEqual(desc, "Swift pass. 7 skills. swiftui: pro, liquid-glass, ui-patterns. "
                                "swift: testing, concurrency, best-practices. Also: supabase.")
         self.assertEqual(desc.count("swiftui"), 1)
+
+    def test_two_plugins_with_a_same_named_skill_keep_their_full_ids(self):
+        self.run_cli("new", "kit", "one:lint", "two:lint", "solo:format")
+        desc = pl.menu_description(pl.get_playlist("kit"))
+        self.assertEqual(desc, "3 skills: one:lint, two:lint, format.")
 
     def test_skill_names_never_wrap_in_the_middle(self):
         self.run_cli("new", "kit", "gcp-cloud-run", "shadcn-ui")

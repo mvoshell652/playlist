@@ -186,8 +186,11 @@ def menu_description(pl):
             label = s if label in seen else label  # two ids that shorten to the same word keep their full id
             seen.add(label)
             items.append((fam, label))
+    # A plugin skill's id repeats itself (`nextjs:nextjs`); the hover shows the skill's own name, and falls
+    # back to the full id only when two plugins ship a skill with the same name.
     rest = [s for s in skills if family_of(s) not in grouped]
-    items += [("Also" if grouped else count(n), s) for s in rest]
+    tails = collections.Counter(s.split(":")[-1] for s in rest)
+    items += [("Also" if grouped else count(n), s.split(":")[-1] if tails[s.split(":")[-1]] == 1 else s) for s in rest]
 
     def compose(shown):
         parts = lead + ([count(n) + "."] if grouped else [])
