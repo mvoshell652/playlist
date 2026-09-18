@@ -30,7 +30,7 @@ Text typed under "Other" is never placed on a command line as typed. Reduce it f
 
 - **A playlist name:** lowercase it, turn spaces into hyphens, then keep only `a-z`, `0-9` and `-`. "My Swift Stuff!" becomes `my-swift-stuff`. Tell the user the final name. If nothing is left, or the CLI rejects the name (already taken, or invalid), show its message and ask again.
 - **A description or an auto-load rule:** keep only letters, digits, spaces, commas, periods and hyphens, at most 80 characters, then put it in single quotes.
-- **A skill or a search word:** keep only letters, digits, `.`, `-`, `_` and `:`. Every skill id you pass to the CLI must be copied from the output of `skills`, `show`, `loaded` or `suggest`, never from what the user typed and never invented.
+- **Skill words for `match`:** split what they typed on spaces and commas, and keep only letters, digits, `.`, `-`, `_` and `:` in each word. Every skill id you pass to the CLI must be copied from the output of `match`, `skills`, `show`, `loaded` or `suggest`, never from what the user typed and never invented.
 
 ## Step 1: the action
 
@@ -46,20 +46,22 @@ Question "What do you want to do with your playlists?", header "Action":
 ## Create
 
 1. **Name.** Question "What should we call your playlist?", header "Name". Offer two or three short names that fit what the user is working on, such as the project or the stack in this conversation. In a fresh session with nothing to go on, offer plain starters such as `my-stack` and `daily`. They type their own under "Other"; reduce it as described above.
-2. **Where the skills come from.** Question "Which skills do you want to add?", header "Skills". First run `loaded --session ${CLAUDE_SESSION_ID}` and `suggest`, then offer only the sources that have something:
+2. **Which skills.** Question "Which skills do you want in it? Pick a source, or type skill names or a description under Other.", header "Skills". First run `loaded --session ${CLAUDE_SESSION_ID}` and `suggest`, then offer:
 
    | Option | Description | Offer it when |
    |---|---|---|
+   | Suggest for this project | I read this project's dependencies and propose the skills that fit | always |
+   | I'll type them | One line of names or a description, such as: nuxt vue pinia vitest a11y | always |
    | From this conversation | The N skills already loaded here | `loaded` lists any |
-   | Search my skills | Find installed skills by a word, such as swift or supabase | always |
    | From my history | Sets of skills you often load together | `suggest` proposes any |
 
-   If "Search my skills" is the only source, skip this question and go to the search. Skill names typed under "Other" are search words.
-3. **Pick the skills.**
-   - From this conversation: take every skill `loaded` listed. The user can drop some at the Confirm step.
-   - Search: ask for the word if they have not given one, run `skills <word> --limit 48`, then see "Picking from a list".
-   - History: question "Which set?", header "History", one option per suggestion (label: a short name you propose; description: how many skills and how often they were loaded together). Choosing one takes all of its skills. With a single suggestion, offer it against "Search instead".
-4. **Confirm.** Show the chosen skills as numbered text. Question "Create /playlist:<name> with these N skills?", header "Confirm", options "Create it", "Add more skills", "Remove some", "Start over". "Add more skills" returns to step 2 and keeps what is chosen. "Remove some" lets them pick from the chosen skills (see "Picking from a list"), then returns here.
+   Anything typed under "Other" is treated exactly like "I'll type them".
+3. **Gather the skills.** The user should never search one word at a time. You do the searching and they review one list.
+   - **I'll type them:** ask in plain chat, not with a question panel: "Type the skills you want, or describe the stack. Partial names are fine, all on one line." Take their reply through "Turning words into skills" below.
+   - **Suggest for this project:** read the dependency and config files that exist in the working directory, such as `package.json`, `nuxt.config.*`, `Package.swift`, `Podfile`, `pyproject.toml`, `requirements.txt`, `go.mod`, `Cargo.toml`, `Gemfile`, `supabase/`, `firebase.json`, `Dockerfile`. Collect the names of the frameworks, libraries and services in use, skip generic utilities, then take those names through "Turning words into skills". Propose at most 12, most central to the project first. If nothing recognisable is found, say so and fall back to "I'll type them".
+   - **From this conversation:** take every skill `loaded` listed.
+   - **From my history:** question "Which set?", header "History", one option per suggestion (label: a short name you propose; description: how many skills and how often they were loaded together). Choosing one takes all of its skills. With a single suggestion, offer it against "I'll type them".
+4. **Review.** Show the chosen skills as numbered text, one per line with a few words on what each is for. Mark with "(my pick)" every skill you chose between several candidates, and name the runner-up so they can swap it. Question "Create /playlist:<name> with these N skills?", header "Confirm", options "Create it", "Add more skills", "Remove some", "Start over". "Add more skills" returns to step 2 and keeps what is chosen. "Remove some" lets them pick from the chosen skills (see "Picking from a list"), then returns here. They can also type a change under "Other", such as "swap shadcn-ui for shadcn-vue" or "drop the testing ones".
 5. Run `new <name> <id> [<id> ...] -d '<description>'`. Write the description yourself: six words or fewer on what the set is for, using only letters, digits and spaces. Add `--project` only if the user asked to share the playlist with their team.
 6. Tell the user it is ready as `/playlist:<name>`, and repeat the note the command printed about when it appears in the / menu.
 
@@ -70,7 +72,7 @@ Question "What do you want to do with your playlists?", header "Action":
 
    | Option | What to do |
    |---|---|
-   | Add skills | Create steps 2 and 3, then `add <name> <id> ...`. "From this conversation" is `add <name> --session ${CLAUDE_SESSION_ID}`. |
+   | Add skills | Create steps 2 and 3, show what you gathered as in the Review step, then `add <name> <id> ...`. "From this conversation" is `add <name> --session ${CLAUDE_SESSION_ID}`. |
    | Remove skills | Run `show <name>`, let them pick from its skills (see "Picking from a list"), then `remove <name> <id> ...`. |
    | Rename it | Ask for the name as in Create step 1, then `rename <name> <new-name>`. |
    | Change description | Offer two short descriptions; they type their own under "Other", reduced as described above. Then `set <name> -d '<text>'`. |
@@ -88,17 +90,30 @@ Question "What do you want to do with your playlists?", header "Action":
 
 Run `list` and show the result as a table. If they want to look inside one, run `show <name>`. If a skill shows as not found, run `doctor` and explain what it reports.
 
+## Turning words into skills
+
+Resolve everything in one call, however many words there are:
+
+    sh "${CLAUDE_SKILL_DIR}/bin/playlist" match <word> [<word> ...]
+
+- From a description ("everything for a Nuxt app with Pinia and testing"), pull out the technology words yourself first: `nuxt pinia vitest`.
+- `match` prints the best installed skills for each word. For each word:
+  - "exact id": take that skill. Take a second row too only when it is clearly the version the user is on, such as `nuxt-v4:nuxt-core` for a Nuxt 4 project.
+  - Several candidates: choose the one that fits what the user is building, using the other words and the project as context. For a Nuxt app, "shadcn" means `shadcn-vue`, not the React `shadcn-ui`, and "server" means the Nuxt server skill. Mark it "(my pick)" in the Review step.
+  - A genuine toss-up, where context does not decide: ask. Put every toss-up in one call, one question per word, header the word itself, options its top candidates.
+  - "no match": try one obvious synonym (`a11y` and `accessibility`, `db` and `database`). If that fails too, tell the user in the Review step which words found nothing.
+- Never add a skill whose id `match` did not print.
+
 ## Picking from a list
 
-The same steps serve adding (candidates come from `skills <word>`) and removing (candidates are the playlist's own skills from `show`, or the chosen skills at the Confirm step). Say "add" or "remove" to match.
+Only for choosing among skills that are already on the table: removing skills from a playlist, "Remove some" at the Review step, and toss-ups. Never use it to browse the whole library.
 
 Use multi-select questions, four skills per question, up to four questions in one call, so one screen shows up to 16 skills. Label each option with the exact skill id and describe it with the first sentence of its description. Number the headers "Pick 1-4", "Pick 5-8", which stays within 12 characters even past 100. When the last question of a screen would hold a single skill, move one skill over from the question before it so both have at least two.
 
-- With more than 16 candidates, first ask, header "How many": "Select all N", "Let me pick", "Filter by a word". "Let me pick" shows 16 per screen; say how many screens remain. "Filter by a word" narrows the current candidates: when adding, run `skills` again with the extra word; when removing, keep only the playlist's own skills that contain the word, and never call `skills`.
+- With more than 16 candidates, first ask, header "How many": "Select all N", "Let me pick", "Filter by a word". "Let me pick" shows 16 per screen; say how many screens remain. "Filter by a word" keeps only the candidates that contain the word.
 - With two to four candidates, ask one question.
-- With one candidate, ask a yes or no question instead, header "Confirm": "Add <id> to <name>?" or "Remove <id> from <name>?", options "Yes" and "Cancel". When creating, skip even that, because the Confirm step follows.
+- With one candidate, ask a yes or no question instead, header "Confirm": "Remove <id> from <name>?", options "Yes" and "Cancel".
 - Picking nothing on a screen is fine; move on to the next screen.
-- Anything typed under "Other" is another search or filter word.
 
 ## After every command
 

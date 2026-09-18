@@ -248,6 +248,41 @@ class ManageTests(Sandbox):
         self.assertLess(out.index("swiftui-pro"), out.index("zz-helper"))
         self.assertNotIn("supabase", out)
 
+    def test_match_resolves_a_whole_stack_in_one_call(self):
+        for name, desc in (("vue", "Vue 3 components."), ("vue-skills", "More Vue."), ("pinia", "State stores."),
+                           ("vite-nuxt", "Nuxt on Vite."), ("nuxt", "Nuxt framework."), ("a11y", "Accessibility checks."),
+                           ("forms", "Accessible forms with a11y in mind."), ("swiftui-pro", "Reviews SwiftUI.")):
+            skill(self.config, name, description=desc)
+        out = self.run_cli("match", "vue", "pinia", "nuxt", "a11y", "zzz", "swift")
+        blocks = {b.split(":")[0]: b for b in out.strip().split("\n") if not b.startswith("  ")}
+        self.assertIn("exact id", blocks["vue"])
+        self.assertIn("exact id", blocks["nuxt"])
+        self.assertEqual(blocks["zzz"], "zzz: no match")
+        self.assertIn("no exact id", blocks["swift"])
+        lines = out.split("\n")
+        vue_rows = lines[lines.index(blocks["vue"]) + 1:lines.index(blocks["pinia"])]
+        self.assertEqual([r.split()[0] for r in vue_rows], ["vue", "vue-skills"])  # exact first, then name matches
+        nuxt_rows = lines[lines.index(blocks["nuxt"]) + 1:lines.index(blocks["a11y"])]
+        self.assertEqual([r.split()[0] for r in nuxt_rows], ["nuxt", "vite-nuxt"])
+        a11y_rows = lines[lines.index(blocks["a11y"]) + 1:lines.index(blocks["zzz"])]
+        self.assertEqual([r.split()[0] for r in a11y_rows], ["a11y", "forms"])  # a description match ranks last
+
+    def test_match_prefers_the_personal_skill_over_its_plugin_copy(self):
+        skill(self.config, "supabase")
+        skill(self.config, "supabase", plugin="sb")
+        os.makedirs(os.path.join(self.config, "plugins"), exist_ok=True)
+        with open(os.path.join(self.config, "plugins", "installed_plugins.json"), "w") as fh:
+            json.dump({"plugins": {"supabase@market": [
+                {"installPath": os.path.join(self.config, "plugins", "cache", "sb")}]}}, fh)
+        rows = [r.split()[0] for r in self.run_cli("match", "supabase").split("\n") if r.startswith("  ")]
+        self.assertEqual(rows, ["supabase", "supabase:supabase"])
+
+    def test_match_ignores_shell_characters_in_a_word(self):
+        skill(self.config, "vue")
+        out = self.run_cli("match", "$(vue)", ";")
+        self.assertIn("exact id", out)
+        self.assertIn(";: no match", out)
+
     def test_plugin_skills_are_indexed_with_their_prefix(self):
         skill(self.config, "supabase", plugin="sb")
         os.makedirs(os.path.join(self.config, "plugins"), exist_ok=True)

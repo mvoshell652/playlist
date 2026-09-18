@@ -507,6 +507,49 @@ def cmd_loaded(a):
     print(f"{count(len(skills))} loaded in this conversation:\n" + "\n".join(f"  {i:>2}. {s}" for i, s in enumerate(skills, 1)))
 
 
+def match_word(word, index, descriptions, limit):
+    """Best installed skills for one word: exact id first, then name matches, then description matches."""
+    w = re.sub(r"[^a-z0-9._:-]", "", word.lower())
+    if not w:
+        return [], False
+    tiers = {}
+    for key in index:
+        low = key.lower()
+        tail = low.split(":")[-1]
+        tokens = set(re.split(r"[-_.:]", low))
+        if low == w or tail == w:
+            tier = 0
+        elif w in tokens:
+            tier = 1
+        elif low.startswith(w) or tail.startswith(w):
+            tier = 2
+        elif w in low:
+            tier = 3
+        elif len(w) >= 3 and re.search(r"\b" + re.escape(w) + r"\b", descriptions[key].lower()):
+            tier = 4
+        else:
+            continue
+        # A personal skill beats its plugin copy, and a short id beats a long one, within a tier.
+        tiers[key] = (tier, ":" in key, len(key), key)
+    ranked = sorted(tiers, key=tiers.get)
+    return ranked[:limit], bool(ranked) and tiers[ranked[0]][0] == 0
+
+
+def cmd_match(a):
+    """Resolve many words in one call, so a playlist spanning several technologies needs one step, not one per word."""
+    index = skill_index()
+    descriptions = {k: read_description(v) for k, v in index.items()}
+    for word in dict.fromkeys(a.words):
+        found, exact = match_word(word, index, descriptions, a.limit)
+        shown = one_line(word, 40)
+        if not found:
+            print(f"{shown}: no match")
+            continue
+        print(f"{shown}: " + ("exact id" if exact else f"no exact id, best {len(found)} shown"))
+        for k in found:
+            print(f"  {k}  {descriptions[k][:90]}")
+
+
 def cmd_new(a):
     skills = list(a.skills) + (session_skills(a.session, a.last) if a.session else [])
     if not skills:
@@ -651,6 +694,10 @@ def main(argv=None):
     p.add_argument("query", nargs="*")
     p.add_argument("--limit", type=int, default=25)
     p.set_defaults(fn=cmd_skills)
+    p = sub.add_parser("match", help="find the best installed skills for several words at once")
+    p.add_argument("words", nargs="+")
+    p.add_argument("--limit", type=int, default=5, help="matches to show per word")
+    p.set_defaults(fn=cmd_match)
     p = sub.add_parser("loaded", help="show the skills loaded in a conversation, without creating anything")
     p.add_argument("--session", required=True, help="session id (${CLAUDE_SESSION_ID})")
     p.add_argument("--last", type=int, help="only the last N turns that loaded skills")
