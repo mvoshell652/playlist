@@ -94,6 +94,10 @@ def one_line(text, limit=120):
     return re.sub(r"\s+", " ", text).strip()[:limit]
 
 
+def count(n):
+    return f"{n} skill" + ("" if n == 1 else "s")
+
+
 def check_name(name):
     if not NAME_RE.match(name or ""):
         raise PlaylistError(f"'{one_line(name, 60)}' is not a valid playlist name. "
@@ -157,7 +161,7 @@ def get_playlist(name, cwd=None):
 def render_skill(pl, index):
     """The SKILL.md a playlist becomes. Static text only, so playing one never runs a command."""
     name, skills, n = pl["name"], pl["skills"], len(pl["skills"])
-    summary = f"Playlist · {n} skill{'s' * (n != 1)}" + (f" · {pl['description']}" if pl["description"] else "")
+    summary = f"Playlist · {count(n)}" + (f" · {pl['description']}" if pl["description"] else "")
     front = [f"name: {name}"]
     if pl["auto_when"]:
         auto = summary + ". Use when " + pl["auto_when"] + "."
@@ -464,7 +468,7 @@ def cmd_list(a):
     else:
         width = max(len(n) for n in lists) + len(NAMESPACE) + 2
         print("\n".join(
-            f"{('/' + NAMESPACE + ':' + n).ljust(width)}  {len(p['skills']):>3} skills  {p['scope']:<8}  "
+            f"{('/' + NAMESPACE + ':' + n).ljust(width)}  {count(len(p['skills'])):>10}  {p['scope']:<8}  "
             f"{p['mode']:<4}  {p['description']}".rstrip() for n, p in sorted(lists.items())))
     for p in problems:
         print(f"Skipped: {p}")
@@ -499,7 +503,7 @@ def cmd_skills(a):
 
 def cmd_loaded(a):
     skills = session_skills(a.session, a.last)
-    print(f"{len(skills)} skills loaded in this conversation:\n" + "\n".join(f"  {i:>2}. {s}" for i, s in enumerate(skills, 1)))
+    print(f"{count(len(skills))} loaded in this conversation:\n" + "\n".join(f"  {i:>2}. {s}" for i, s in enumerate(skills, 1)))
 
 
 def cmd_new(a):
@@ -509,7 +513,7 @@ def cmd_new(a):
     if a.name in all_playlists() and not a.force:
         raise PlaylistError(f"Playlist '{a.name}' already exists. Pass --force to replace it, or use `add`.")
     folder = write_playlist(a.name, skills, a.description or "", a.mode, project=a.project)
-    print(f"Created playlist '{a.name}' with {len(set(skills))} skills in {folder}\n"
+    print(f"Created playlist '{a.name}' with {count(len(set(skills)))} in {folder}\n"
           + "\n".join(f"  {i:>2}. {s}" for i, s in enumerate(dict.fromkeys(skills), 1)) + "\n"
           + MENU_NOTE.format(ns=NAMESPACE, name=a.name) + not_on_disk(skills))
 
@@ -530,7 +534,7 @@ def cmd_edit(a):
         skills = pl["skills"] + given
     write_playlist(pl["name"], skills, pl["description"], pl["mode"], pl["auto_when"], folder=os.path.dirname(pl["path"]))
     changed = len(set(skills)) - len(pl["skills"])
-    print(f"/{NAMESPACE}:{pl['name']} now has {len(set(skills))} skills ({changed:+d}). The change is live in this session."
+    print(f"/{NAMESPACE}:{pl['name']} now has {count(len(set(skills)))} ({changed:+d}). The change is live in this session."
           + (not_on_disk(given) if a.command == "add" else ""))
 
 
@@ -556,7 +560,7 @@ def cmd_rename(a):
 def cmd_delete(a):
     pl = get_playlist(a.name)
     remove_playlist(pl)
-    print(f"Deleted playlist '{pl['name']}' ({len(pl['skills'])} skills). "
+    print(f"Deleted playlist '{pl['name']}' ({count(len(pl['skills']))}). "
           f"It leaves the / menu from your next session. The skills themselves are untouched.")
 
 

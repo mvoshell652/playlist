@@ -25,16 +25,20 @@ Needs Python 3.8 or newer on PATH as `python3`, `python` or `py`. No other depen
 
 ## Manage playlists
 
-Every command autocompletes from `/playlists:` and also works in plain language ("add swiftdata-pro to swift").
+One command: `/playlists:manage`. Run it with nothing after it and it walks you through a short menu, using Claude's own question panel so you pick instead of type:
 
-| Command | What it does |
-|---|---|
-| `/playlists:new <name> [skill ...]` | Create a playlist. With no skills it captures the ones loaded in this conversation. |
-| `/playlists:add <playlist> <skill ...>` | Add skills. Partial names work; Claude finds the exact id and asks when several match. |
-| `/playlists:remove <playlist> <skill ...>` | Take skills out. |
-| `/playlists:delete <playlist>` | Delete a whole playlist, after confirming. The skills stay installed. |
-| `/playlists:list [playlist]` | See your playlists, or what is inside one. |
-| `/playlists:suggest` | Propose playlists from skills you repeatedly load together. Reads local transcripts only. |
+1. **What do you want to do?** Create a playlist, edit one, delete one, or see your playlists.
+2. **What should we call it?** A few suggested names, or type your own.
+3. **Which skills do you want to add?** The ones loaded in this conversation, a search of your installed skills, or sets you often load together. You tick skills from a list, 16 to a screen.
+
+Editing offers add skills, remove skills, rename and change description. Deleting always asks first, and never touches the skills themselves.
+
+If you already know what you want, say it and the menu skips ahead:
+
+```
+/playlists:manage add swiftdata to swift
+/playlists:manage delete review
+```
 
 Adding or removing a skill takes effect in the current session. A new, renamed or deleted playlist appears in the `/` menu from your next session.
 
@@ -67,7 +71,7 @@ The generated `SKILL.md` is static text that tells Claude which skills to load. 
 
 ### Share with a team
 
-`/playlists:new <name> --project` writes the playlist to `<repo>/.claude/skills/playlist/`. Commit it, and everyone who opens the repo gets `/playlist:<name>` without installing this plugin. Claude Code loads project plugins only after the workspace trust prompt, and only from the folder the session starts in.
+Ask `/playlists:manage` to share a playlist with your team and it writes the playlist to `<repo>/.claude/skills/playlist/`. Commit it, and everyone who opens the repo gets `/playlist:<name>` without installing this plugin. Claude Code loads project plugins only after the workspace trust prompt, and only from the folder the session starts in.
 
 ### Safety
 
