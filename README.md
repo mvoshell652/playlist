@@ -2,13 +2,9 @@
 
 Skill playlists for Claude Code. Group any of your installed skills under one name, then load them all from the slash menu.
 
-Type `/playlist` and the menu shows the tool, then every playlist you have:
+Type `/playlist` and the menu shows the tool, then every playlist you have. Hover over one to see what is in it:
 
-```
-playlist            create, edit and delete playlists
-playlist:db
-playlist:swift
-```
+<img src="docs/menu.png" width="760" alt="Claude Code's slash menu after typing /playlist. It lists playlist, playlist:db, playlist:swift and four more. The hover text for playlist:swift reads: Full Swift and SwiftUI pass. 20 skills, followed by every skill grouped under SWIFTUI and SWIFT.">
 
 Pick one and add your request:
 
@@ -16,7 +12,9 @@ Pick one and add your request:
 /playlist:swift review LoginView before I commit
 ```
 
-Claude says `Loading 20 skills from playlist "swift"`, loads every skill in parallel, confirms `▶ swift · 20/20 skills loaded`, and carries on with your request.
+Claude says how many skills it is loading, loads every one in parallel, confirms `▶ swift · 20/20 skills loaded`, and carries on with your request:
+
+<img src="docs/loading.png" width="460" alt="Claude Code replying: Loading 20 skills from playlist swift, with the first skill running.">
 
 ## Why
 
