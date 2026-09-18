@@ -7,6 +7,8 @@ Every playlist is a real skill inside a skills-directory plugin named `playlist`
     ~/.claude/skills/playlist/skills/<name>/playlist.json   the playlist (source of truth)
     ~/.claude/skills/playlist/skills/<name>/SKILL.md        generated from it
 
+People manage playlists through one guided command, /playlists:manage, which calls this CLI.
+
 Claude Code namespaces a plugin's skills by the plugin name, so typing `/playlist:`
 autocompletes to every playlist, exactly like any other command. The generated
 SKILL.md is static text: no shell runs when a playlist is played.
@@ -69,14 +71,20 @@ def project_plugin_root(cwd=None):
 
 
 def ensure_manifest(root):
+    """The manifest is what makes the folder a plugin, and so what puts playlists under /playlist: in the menu."""
     path = os.path.join(root, ".claude-plugin", "plugin.json")
-    if not os.path.exists(path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as fh:
-            json.dump({"name": NAMESPACE, "version": "1.0.0",
-                       "description": "Your skill playlists. Type /playlist: to pick one. Managed with /playlists:new, "
-                                      "/playlists:add, /playlists:remove and /playlists:delete."}, fh, indent=2)
-            fh.write("\n")
+    text = json.dumps({"name": NAMESPACE, "version": "1.0.0",
+                       "description": "Your skill playlists. Type /playlist: to pick one. "
+                                      "Create and edit them with /playlists:manage."}, indent=2) + "\n"
+    try:
+        with open(path) as fh:
+            if fh.read() == text:
+                return
+    except OSError:
+        pass
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as fh:
+        fh.write(text)
 
 
 # ---------------------------------------------------------------- playlists
@@ -152,10 +160,11 @@ def render_skill(pl, index):
     summary = f"Playlist · {n} skill{'s' * (n != 1)}" + (f" · {pl['description']}" if pl["description"] else "")
     front = [f"name: {name}"]
     if pl["auto_when"]:
-        front += [f"description: {json.dumps(f'{summary}. Use when {pl['auto_when']}.', ensure_ascii=False)}"]
+        auto = summary + ". Use when " + pl["auto_when"] + "."
+        front += ["description: " + json.dumps(auto, ensure_ascii=False)]
     else:
         # Loading many skills unasked is an expensive surprise, so a playlist only plays when the user calls it.
-        front += [f"description: {json.dumps(summary, ensure_ascii=False)}", "disable-model-invocation: true"]
+        front += ["description: " + json.dumps(summary, ensure_ascii=False), "disable-model-invocation: true"]
     front.append('argument-hint: "[your request]"')
     if pl["mode"] == "pick":
         rows = "\n".join(f"- {s}" + (f": {read_description(index[s])}" if s in index and read_description(index[s]) else "")
@@ -177,8 +186,8 @@ def render_skill(pl, index):
             f"3. When the calls return, start your reply with one line: `▶ {name} · <loaded>/{n} skills loaded`. Count a "
             f"skill as loaded only if its Skill call returned the skill's content, and name every skill whose call failed.")
     return ("---\n" + "\n".join(front) + "\n---\n\n"
-            "<!-- Generated from playlist.json by the playlists plugin. Change it with /playlists:add and "
-            "/playlists:remove; hand edits here are overwritten. -->\n\n"
+            "<!-- Generated from playlist.json by the playlists plugin. Change it with /playlists:manage; "
+            "hand edits here are overwritten. -->\n\n"
             f"This is the \"{name}\" skill playlist: {n} skills that load together.\n\n{steps}\n"
             f"4. Then carry out the user's request with those skills applied. If the request below is empty, stop after step 3.\n\n"
             f"The user's request: $ARGUMENTS\n")
@@ -488,6 +497,11 @@ def cmd_skills(a):
         print(f"\n... {len(rows) - a.limit} more. Narrow it with another word.")
 
 
+def cmd_loaded(a):
+    skills = session_skills(a.session, a.last)
+    print(f"{len(skills)} skills loaded in this conversation:\n" + "\n".join(f"  {i:>2}. {s}" for i, s in enumerate(skills, 1)))
+
+
 def cmd_new(a):
     skills = list(a.skills) + (session_skills(a.session, a.last) if a.session else [])
     if not skills:
@@ -632,6 +646,10 @@ def main(argv=None):
     p.add_argument("query", nargs="*")
     p.add_argument("--limit", type=int, default=25)
     p.set_defaults(fn=cmd_skills)
+    p = sub.add_parser("loaded", help="show the skills loaded in a conversation, without creating anything")
+    p.add_argument("--session", required=True, help="session id (${CLAUDE_SESSION_ID})")
+    p.add_argument("--last", type=int, help="only the last N turns that loaded skills")
+    p.set_defaults(fn=cmd_loaded)
     p = sub.add_parser("new", help="create a playlist from named skills and/or this conversation's skills")
     p.add_argument("name")
     p.add_argument("skills", nargs="*")
