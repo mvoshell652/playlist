@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/mvoshell652/playlist/actions/workflows/ci.yml/badge.svg)](https://github.com/mvoshell652/playlist/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Skill playlists for Claude Code. Group any of your installed skills under one name, then load them all from the slash menu.
+Playlist for Claude Code allows you to group any of your installed skills under one name, then load them all from the slash menu.
 
 Type `/playlist` and the menu shows the tool, then every playlist you have. Hover over one to see what is in it:
 
