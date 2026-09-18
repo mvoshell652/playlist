@@ -159,25 +159,48 @@ def get_playlist(name, cwd=None):
     return lists[name]
 
 
-def menu_description(pl):
-    """What the slash menu shows beside a playlist: what it is for, then every skill in it.
+NB_HYPHEN = "\u2011"  # looks like a hyphen but never wraps, so a skill name is not split across two lines
 
-    Each skill goes on its own bulleted line. The space before every line break keeps the
-    list readable as one `•`-separated run in menus that strip line breaks.
+
+def family_of(skill):
+    """`swiftui-liquid-glass` and `nuxt-v4:nuxt-core` belong to the families `swiftui` and `nuxt`."""
+    return re.split(r"[-_.]", skill.split(":")[-1])[0].lower()
+
+
+def menu_description(pl):
+    """The hover text beside a playlist in the slash menu: what it is for, then what is in it.
+
+    The menu shows this as one wrapped paragraph and strips line breaks, so it is written as
+    short sentences. Three or more skills that share a first word are grouped under it, which
+    says `swiftui` once instead of seven times and leaves the distinct part of each name.
     """
-    n = len(pl["skills"])
-    text = f"Playlist · {count(n)}" + (f" · {pl['description']}" if pl["description"] else "")
-    if pl["auto_when"]:
-        text += ". Use when " + pl["auto_when"] + "."  # before the list, so a trimmed listing keeps the rule
-    shown = 0
-    for skill in pl["skills"]:
-        line = f" \n• {skill}"
-        room_for_more = 16 if shown + 1 < n else 0
-        if len(text) + len(line) + room_for_more > DESCRIPTION_LIMIT:
-            break
-        text += line
-        shown += 1
-    return text + (f" \n+ {n - shown} more" if shown < n else "")
+    skills, n = pl["skills"], len(pl["skills"])
+    lead = [text.rstrip(". ") + "." for text in (pl["description"], pl["auto_when"] and "Use when " + pl["auto_when"]) if text]
+    sizes = collections.Counter(family_of(s) for s in skills)
+    grouped = [f for f in dict.fromkeys(family_of(s) for s in skills) if sizes[f] >= 3]
+    items = []
+    for fam in grouped:
+        seen = set()
+        for s in (s for s in skills if family_of(s) == fam):
+            label = s.split(":")[-1][len(fam):].lstrip("-_.") or fam
+            label = s if label in seen else label  # two ids that shorten to the same word keep their full id
+            seen.add(label)
+            items.append((fam, label))
+    rest = [s for s in skills if family_of(s) not in grouped]
+    items += [("Also" if grouped else count(n), s) for s in rest]
+
+    def compose(shown):
+        parts = lead + ([count(n) + "."] if grouped else [])
+        for label, members in itertools.groupby(shown, key=lambda item: item[0]):
+            parts.append(f"{label}: " + ", ".join(m.replace("-", NB_HYPHEN) for _, m in members) + ".")
+        if len(shown) < n:
+            parts.append(f"And {n - len(shown)} more.")
+        return " ".join(parts)
+
+    keep = n
+    while keep and len(compose(items[:keep])) > DESCRIPTION_LIMIT:
+        keep -= 1
+    return compose(items[:keep])
 
 
 def render_skill(pl, index):
@@ -231,7 +254,7 @@ def write_playlist(name, skills, description="", mode="all", auto_when="", proje
     for filename, text in (("playlist.json", json.dumps(pl, indent=2) + "\n"),
                            ("SKILL.md", render_skill(pl, skill_index(cwd) if pl["mode"] == "pick" else {}))):
         tmp = os.path.join(folder, filename + ".tmp")
-        with open(tmp, "w") as fh:
+        with open(tmp, "w", encoding="utf-8") as fh:
             fh.write(text)
         os.replace(tmp, os.path.join(folder, filename))
     return folder
@@ -662,7 +685,7 @@ def cmd_doctor(a):
         problems += bool(missing)
         skill_md = os.path.join(os.path.dirname(pl["path"]), "SKILL.md")
         try:
-            with open(skill_md) as fh:
+            with open(skill_md, encoding="utf-8") as fh:
                 stale = fh.read() != render_skill(pl, index if pl["mode"] == "pick" else {})
         except OSError:
             stale = True

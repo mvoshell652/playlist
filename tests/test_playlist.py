@@ -56,7 +56,7 @@ class Sandbox(unittest.TestCase):
         return out.getvalue()
 
     def skill_md(self, name, root=None):
-        with open(os.path.join(root or self.home, "skills", name, "SKILL.md")) as fh:
+        with open(os.path.join(root or self.home, "skills", name, "SKILL.md"), encoding="utf-8") as fh:
             return fh.read()
 
     def write_session(self, name, lines, project="p"):
@@ -110,32 +110,50 @@ class SlashMenuTests(Sandbox):
         text = self.skill_md("swift")
         front = text.split("---")[1]
         self.assertIn("name: swift\n", front)
-        self.assertIn('description: "Playlist · 2 skills · Full \\"Swift\\": pass \\n• a \\n• b"', front)
+        self.assertIn('description: "Full \\"Swift\\": pass. 2 skills: a, b."', front)
         self.assertIn("disable-model-invocation: true", front)
 
-    def test_menu_description_lists_every_skill_in_order_one_per_line(self):
+    def test_menu_description_leads_with_purpose_and_reads_as_sentences(self):
         self.run_cli("new", "kit", "zeta", "alpha", "supabase:supabase", "-d", "Mixed stack")
         desc = pl.menu_description(pl.get_playlist("kit"))
-        self.assertEqual(desc, "Playlist · 3 skills · Mixed stack \n• zeta \n• alpha \n• supabase:supabase")
-        # Stays readable where a menu strips line breaks instead of rendering them.
-        self.assertEqual(desc.replace("\n", ""), "Playlist · 3 skills · Mixed stack • zeta • alpha • supabase:supabase")
-        self.assertEqual(self.skill_md("kit").split("---")[1].count("\n"), 5)  # the list is escaped, not extra YAML lines
+        self.assertEqual(desc, "Mixed stack. 3 skills: zeta, alpha, supabase:supabase.")
+        for noise in ("Playlist", "\u00b7", "\u2022", "\n"):  # the menu already says (playlist); dots and breaks ran together
+            self.assertNotIn(noise, desc)
+
+    def test_menu_description_groups_a_family_and_says_its_name_once(self):
+        self.run_cli("new", "swift", "swiftui-pro", "swiftui-liquid-glass", "swiftui-ui-patterns", "swift-testing",
+                     "swift-concurrency", "swift-best-practices:swift-best-practices", "supabase", "-d", "Swift pass.")
+        desc = pl.menu_description(pl.get_playlist("swift")).replace(pl.NB_HYPHEN, "-")
+        self.assertEqual(desc, "Swift pass. 7 skills. swiftui: pro, liquid-glass, ui-patterns. "
+                               "swift: testing, concurrency, best-practices. Also: supabase.")
+        self.assertEqual(desc.count("swiftui"), 1)
+
+    def test_skill_names_never_wrap_in_the_middle(self):
+        self.run_cli("new", "kit", "gcp-cloud-run", "shadcn-ui")
+        desc = pl.menu_description(pl.get_playlist("kit"))
+        self.assertNotIn("-", desc)
+        self.assertIn("gcp" + pl.NB_HYPHEN + "cloud" + pl.NB_HYPHEN + "run", desc)
+
+    def test_a_skill_named_like_its_family_and_two_ids_with_one_short_name_stay_distinct(self):
+        self.run_cli("new", "nuxt", "nuxt", "nuxt-v4:nuxt-core", "nuxt-v5:nuxt-core", "nuxt-data")
+        desc = pl.menu_description(pl.get_playlist("nuxt")).replace(pl.NB_HYPHEN, "-")
+        self.assertEqual(desc, "4 skills. nuxt: nuxt, core, nuxt-v5:nuxt-core, data.")
 
     def test_menu_description_stays_within_the_spec_limit_and_says_how_many_are_left_out(self):
         ids = [f"a-rather-long-skill-name-number-{i:03}" for i in range(80)]
         self.run_cli("new", "huge", *ids)
         desc = pl.menu_description(pl.get_playlist("huge"))
         self.assertLessEqual(len(desc), pl.DESCRIPTION_LIMIT)
-        listed = desc.count("•")
+        listed = desc.count(",") + 1
         self.assertTrue(0 < listed < 80)
-        self.assertTrue(desc.endswith(f"+ {80 - listed} more"))
-        self.assertIn(ids[0], desc)
+        self.assertTrue(desc.endswith(f"And {80 - listed} more."))
+        self.assertTrue(desc.startswith("80 skills."))
 
     def test_auto_rule_comes_before_the_skill_list(self):
-        self.run_cli("new", "kit", "a", "b")
+        self.run_cli("new", "kit", "a", "b", "-d", "Two things")
         self.run_cli("set", "kit", "--auto", "working on Swift code")
-        desc = pl.menu_description(pl.get_playlist("kit"))
-        self.assertLess(desc.index("Use when working on Swift code."), desc.index("• a"))
+        self.assertEqual(pl.menu_description(pl.get_playlist("kit")),
+                         "Two things. Use when working on Swift code. 2 skills: a, b.")
 
     def test_generated_skill_announces_loads_in_parallel_and_reports_a_count(self):
         self.run_cli("new", "swift", "swiftui-pro", "swift-testing", "swiftui-pro")
@@ -184,7 +202,7 @@ class ManageTests(Sandbox):
         self.assertIn("now has 3 skills (+1)", self.run_cli("add", "kit", "c", "a"))
         self.assertIn("now has 2 skills (-1)", self.run_cli("remove", "kit", "b"))
         self.assertIn("   1. a\n   2. c", self.skill_md("kit"))
-        self.assertIn("Playlist · 2 skills", self.skill_md("kit"))
+        self.assertIn("2 skills: a, c.", self.skill_md("kit"))
 
     def test_remove_says_when_a_skill_is_not_in_the_playlist(self):
         self.run_cli("new", "kit", "a", "b")
