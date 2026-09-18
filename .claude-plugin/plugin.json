@@ -1,8 +1,15 @@
 {
   "name": "playlists",
   "displayName": "Skill Playlists",
-  "version": "0.1.0",
-  "description": "Save any set of skills as a named playlist and load them all with one reference: /playlists:play swift, or @@swift anywhere in a message.",
-  "author": { "name": "Matthew Voshell" },
-  "keywords": ["skills", "playlists", "collections", "workflow"]
+  "version": "0.2.0",
+  "description": "Skill playlists: group any installed skills under one name, then type /playlist: and pick one to load them all. Manage with /playlists:new, add, remove, delete, list and suggest.",
+  "author": {
+    "name": "Matthew Voshell"
+  },
+  "keywords": [
+    "skills",
+    "playlists",
+    "collections",
+    "workflow"
+  ]
 }
