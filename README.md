@@ -38,13 +38,18 @@ Run `/playlist` with nothing after it. It walks you through a short menu using C
 
 1. **What do you want to do?** Create a playlist, edit one, delete one, or see your playlists.
 2. **What should we call it?** A few suggested names, or type your own.
-3. **Which skills do you want to add?** The ones loaded in this conversation, a search of your installed skills, or sets you often load together. You tick skills from a list, 16 to a screen.
+3. **Which skills do you want in it?** You never search one word at a time:
+   - **Type them all on one line.** Names, partial names or a description: `nuxt vue pinia shadcn vitest a11y`, or "everything for a Nuxt app with Pinia and testing". Claude resolves every word in one pass.
+   - **Suggest for this project.** Claude reads the project's dependency files and proposes the installed skills that fit the stack.
+   - **From this conversation**, or **from your history** of skills you often load together.
+4. **Review one list.** Claude shows what it gathered, marks the places where it chose between similar skills so you can swap them, and asks only about genuine toss-ups. Create it, add more, or remove some.
 
 Editing offers add skills, remove skills, rename and change description. Deleting always asks first, and never touches the skills themselves.
 
 If you already know what you want, say it and the menu skips ahead:
 
 ```
+/playlist new nuxt-app with nuxt vue pinia shadcn vitest a11y
 /playlist add swiftdata to swift
 /playlist delete review
 ```
