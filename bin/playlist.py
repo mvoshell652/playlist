@@ -32,6 +32,8 @@ NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 SKILL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$")
 CMD_RE = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
 MODES = ("all", "pick")
+# The Agent Skills spec caps a description at 1,024 characters.
+DESCRIPTION_LIMIT = 1024
 # Skills the harness loads for its own purposes; nobody picks these, so they are noise in a mined playlist.
 HARNESS_SKILLS = {"artifact-design", "artifact-capabilities", "artifact-diagramming", "workflow-authoring"}
 MENU_NOTE = ("To add it to the slash menu now, type /reload-plugins; otherwise /{ns}:{name} appears in your next "
@@ -157,17 +159,34 @@ def get_playlist(name, cwd=None):
     return lists[name]
 
 
+def menu_description(pl):
+    """What the slash menu shows beside a playlist: what it is for, then every skill in it.
+
+    Each skill goes on its own bulleted line. The space before every line break keeps the
+    list readable as one `•`-separated run in menus that strip line breaks.
+    """
+    n = len(pl["skills"])
+    text = f"Playlist · {count(n)}" + (f" · {pl['description']}" if pl["description"] else "")
+    if pl["auto_when"]:
+        text += ". Use when " + pl["auto_when"] + "."  # before the list, so a trimmed listing keeps the rule
+    shown = 0
+    for skill in pl["skills"]:
+        line = f" \n• {skill}"
+        room_for_more = 16 if shown + 1 < n else 0
+        if len(text) + len(line) + room_for_more > DESCRIPTION_LIMIT:
+            break
+        text += line
+        shown += 1
+    return text + (f" \n+ {n - shown} more" if shown < n else "")
+
+
 def render_skill(pl, index):
     """The SKILL.md a playlist becomes. Static text only, so playing one never runs a command."""
     name, skills, n = pl["name"], pl["skills"], len(pl["skills"])
-    summary = f"Playlist · {count(n)}" + (f" · {pl['description']}" if pl["description"] else "")
-    front = [f"name: {name}"]
-    if pl["auto_when"]:
-        auto = summary + ". Use when " + pl["auto_when"] + "."
-        front += ["description: " + json.dumps(auto, ensure_ascii=False)]
-    else:
+    front = [f"name: {name}", "description: " + json.dumps(menu_description(pl), ensure_ascii=False)]
+    if not pl["auto_when"]:
         # Loading many skills unasked is an expensive surprise, so a playlist only plays when the user calls it.
-        front += ["description: " + json.dumps(summary, ensure_ascii=False), "disable-model-invocation: true"]
+        front.append("disable-model-invocation: true")
     front.append('argument-hint: "[your request]"')
     if pl["mode"] == "pick":
         rows = "\n".join(f"- {s}" + (f": {read_description(index[s])}" if s in index and read_description(index[s]) else "")

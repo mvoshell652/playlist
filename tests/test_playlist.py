@@ -110,8 +110,32 @@ class SlashMenuTests(Sandbox):
         text = self.skill_md("swift")
         front = text.split("---")[1]
         self.assertIn("name: swift\n", front)
-        self.assertIn('description: "Playlist · 2 skills · Full \\"Swift\\": pass"', front)
+        self.assertIn('description: "Playlist · 2 skills · Full \\"Swift\\": pass \\n• a \\n• b"', front)
         self.assertIn("disable-model-invocation: true", front)
+
+    def test_menu_description_lists_every_skill_in_order_one_per_line(self):
+        self.run_cli("new", "kit", "zeta", "alpha", "supabase:supabase", "-d", "Mixed stack")
+        desc = pl.menu_description(pl.get_playlist("kit"))
+        self.assertEqual(desc, "Playlist · 3 skills · Mixed stack \n• zeta \n• alpha \n• supabase:supabase")
+        # Stays readable where a menu strips line breaks instead of rendering them.
+        self.assertEqual(desc.replace("\n", ""), "Playlist · 3 skills · Mixed stack • zeta • alpha • supabase:supabase")
+        self.assertEqual(self.skill_md("kit").split("---")[1].count("\n"), 5)  # the list is escaped, not extra YAML lines
+
+    def test_menu_description_stays_within_the_spec_limit_and_says_how_many_are_left_out(self):
+        ids = [f"a-rather-long-skill-name-number-{i:03}" for i in range(80)]
+        self.run_cli("new", "huge", *ids)
+        desc = pl.menu_description(pl.get_playlist("huge"))
+        self.assertLessEqual(len(desc), pl.DESCRIPTION_LIMIT)
+        listed = desc.count("•")
+        self.assertTrue(0 < listed < 80)
+        self.assertTrue(desc.endswith(f"+ {80 - listed} more"))
+        self.assertIn(ids[0], desc)
+
+    def test_auto_rule_comes_before_the_skill_list(self):
+        self.run_cli("new", "kit", "a", "b")
+        self.run_cli("set", "kit", "--auto", "working on Swift code")
+        desc = pl.menu_description(pl.get_playlist("kit"))
+        self.assertLess(desc.index("Use when working on Swift code."), desc.index("• a"))
 
     def test_generated_skill_announces_loads_in_parallel_and_reports_a_count(self):
         self.run_cli("new", "swift", "swiftui-pro", "swift-testing", "swiftui-pro")
