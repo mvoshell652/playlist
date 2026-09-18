@@ -133,6 +133,7 @@ sh ~/.claude/skills/playlist/bin/playlist <command>
 | `delete <playlist>` | Delete the playlist. The skills stay installed |
 | `skills [word ...]` | Search your installed skills by word. `--limit N` |
 | `match <word ...>` | The best installed skills for several words in one pass. `--limit N` per word |
+| `cost <skill ...>` | Roughly how many tokens those skills add to a conversation when loaded |
 | `loaded --session <id>` | The skills a conversation has loaded, without creating anything |
 | `suggest` | Sets of skills you repeatedly load in the same turn. `--min-support N` sets how often (default 3), `--dismiss N ...` hides suggestions for good, `--json` for scripts |
 | `doctor` | Checks every playlist for skills that are no longer installed and for hand-edited files |

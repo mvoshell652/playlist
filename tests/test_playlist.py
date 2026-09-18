@@ -310,6 +310,22 @@ class ManageTests(Sandbox):
             self.assertIn("plays it right now", out)
         self.assertIn("`/playlist kit`", self.run_cli("rename", "fresh", "kit"))
 
+    def test_menu_copy_follows_its_own_wording_rules(self):
+        with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
+            menu = fh.read()
+        questions = re.findall(r'[Qq]uestion "([^"]+)"', menu)
+        self.assertGreaterEqual(len(questions), 9)
+        for q in questions:
+            self.assertTrue(q.endswith("?"), q)
+            self.assertLessEqual(q.count(". ") + q.count("? "), 1, q)   # one sentence, plus at most a short lead-in
+            self.assertNotIn("Other", q)                                # the panel explains its own Other field
+            self.assertNotRegex(q, r"\b(we|We|please|simply|just)\b")
+        for header in re.findall(r'header "([^"]+)"', menu):
+            self.assertLessEqual(len(header), 12, header)               # the panel rejects longer headers
+        self.assertIn("Suggest from this folder", menu)                 # says where suggestions come from
+        self.assertIn("`<folder>`", menu)
+        self.assertNotIn("Suggest for this project", menu)
+
     def test_the_menu_ends_a_create_with_play_it_now_and_never_claims_to_reload(self):
         with open(os.path.join(ROOT, "SKILL.md")) as fh:
             menu = fh.read()
@@ -325,6 +341,14 @@ class ManageTests(Sandbox):
         self.assertNotIn("1 skills", out)
         self.assertIn("with 1 skill in", out)
         self.assertIn("(1 skill)", out)
+
+    def test_cost_estimates_tokens_from_skill_size_and_admits_what_it_cannot_measure(self):
+        skill(self.config, "a", body="x" * 4000)
+        skill(self.config, "b", body="y" * 8000)
+        self.assertRegex(self.run_cli("cost", "a", "b"), r"^2 skills, about 3,0\d\d tokens when loaded\.")
+        self.assertIn("not counting 1 skill whose size is unknown", self.run_cli("cost", "a", "ghost"))
+        self.assertIn("Playing it adds about", self.run_cli("new", "kit", "a", "b"))
+        self.assertIn("Playing it adds about", self.run_cli("show", "kit"))
 
     def test_new_and_add_warn_about_ids_that_are_not_installed(self):
         skill(self.config, "real")

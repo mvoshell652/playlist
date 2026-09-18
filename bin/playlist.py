@@ -359,6 +359,18 @@ def skill_index(cwd=None):
     return index
 
 
+def load_cost(skills, cwd=None):
+    """Roughly what playing these skills adds to a conversation, from the size of each SKILL.md (about 4 characters a token).
+
+    A skill's reference files are read only when needed, so they are not counted.
+    """
+    index = skill_index(cwd)
+    size = sum(os.path.getsize(index[s]) for s in skills if s in index)
+    unknown = sum(1 for s in skills if s not in index)
+    text = f"about {int(round(size / 4, -2)):,} tokens"
+    return text + (f", not counting {count(unknown)} whose size is unknown" if unknown else "")
+
+
 def not_on_disk(skills, cwd=None):
     index = skill_index(cwd)
     missing = [s for s in skills if s not in index]
@@ -534,6 +546,7 @@ def cmd_show(a):
     print(f"/{NAMESPACE}:{pl['name']} ({pl['scope']}, loads {pl['mode']}) {pl['description']}")
     if pl["auto_when"]:
         print(f"Claude may load it on its own when {pl['auto_when']}.")
+    print(f"Playing it adds {load_cost(pl['skills'])} to a conversation.")
     print(os.path.dirname(pl["path"]) + "\n")
     for i, s in enumerate(pl["skills"], 1):
         print(f"  {i:>2}. {s}" + ("" if s in index else "   (not found on disk)"))
@@ -588,6 +601,11 @@ def match_word(word, index, descriptions, limit):
     return ranked[:limit], bool(ranked) and tiers[ranked[0]][0] == 0
 
 
+def cmd_cost(a):
+    skills = check_skills(a.skills)
+    print(f"{count(len(skills))}, {load_cost(skills)} when loaded.")
+
+
 def cmd_match(a):
     """Resolve many words in one call, so a playlist spanning several technologies needs one step, not one per word."""
     index = skill_index()
@@ -612,6 +630,7 @@ def cmd_new(a):
     folder = write_playlist(a.name, skills, a.description or "", a.mode, project=a.project)
     print(f"Created playlist '{a.name}' with {count(len(set(skills)))} in {folder}\n"
           + "\n".join(f"  {i:>2}. {s}" for i, s in enumerate(dict.fromkeys(skills), 1)) + "\n"
+          + f"Playing it adds {load_cost(skills)} to a conversation.\n"
           + MENU_NOTE.format(ns=NAMESPACE, name=a.name) + not_on_disk(skills))
 
 
@@ -763,6 +782,9 @@ def main(argv=None):
     p.add_argument("words", nargs="+")
     p.add_argument("--limit", type=int, default=5, help="matches to show per word")
     p.set_defaults(fn=cmd_match)
+    p = sub.add_parser("cost", help="estimate the tokens a set of skills adds to a conversation when loaded")
+    p.add_argument("skills", nargs="+")
+    p.set_defaults(fn=cmd_cost)
     p = sub.add_parser("loaded", help="show the skills loaded in a conversation, without creating anything")
     p.add_argument("--session", required=True, help="session id (${CLAUDE_SESSION_ID})")
     p.add_argument("--last", type=int, help="only the last N turns that loaded skills")
