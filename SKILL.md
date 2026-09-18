@@ -63,19 +63,28 @@ Question "What do you want to do with your playlists?", header "Action":
    - **From my history:** question "Which set?", header "History", one option per suggestion (label: a short name you propose; description: how many skills and how often they were loaded together). Choosing one takes all of its skills. With a single suggestion, offer it against "I'll type them".
 4. **Review.** Show the chosen skills as numbered text, one per line with a few words on what each is for. Mark with "(my pick)" every skill you chose between several candidates, and name the runner-up so they can swap it. Question "Create /playlist:<name> with these N skills?", header "Confirm", options "Create it", "Add more skills", "Remove some", "Start over". "Add more skills" returns to step 2 and keeps what is chosen. "Remove some" lets them pick from the chosen skills (see "Picking from a list"), then returns here. They can also type a change under "Other", such as "swap shadcn-ui for shadcn-vue" or "drop the testing ones".
 5. Run `new <name> <id> [<id> ...] -d '<description>'`. Write the description yourself: six words or fewer on what the set is for, using only letters, digits and spaces. Add `--project` only if the user asked to share the playlist with their team.
-6. **Finish.** Say the playlist is ready in one line, then put this on a line of its own so it is easy to copy:
-
-       /reload-plugins
-
-   and explain in one sentence that typing it adds `/playlist:<name>` to the slash menu now, and that otherwise it appears in their next session. You cannot run that command for them; only the user can type it.
-7. **What next.** Question "Your playlist is ready. What next?", header "Next":
+6. **What next.** Say in one line that the playlist is created, with its skill count. Then question "/playlist:<name> is ready. What next?", header "Next":
 
    | Option | Description |
    |---|---|
    | Play it now | Load its N skills into this conversation right away |
    | Done | Close the menu |
 
-   On "Play it now", play it as described under "Playing a playlist from here". If they type a request under "Other", play it with that request.
+7. **The reload call-out.** Once they answer, print the call-out below, exactly as written apart from the name, under a horizontal rule. It must stand out, so:
+   - On "Done", the call-out is the whole of your reply and the last thing on screen. Do not follow it with a list or table of playlists, a summary, or any other text.
+   - On "Play it now", or a request typed under "Other", print the call-out first, then play the playlist as described under "Playing a playlist from here".
+
+   ```markdown
+   ---
+
+   ### One step left: add it to your / menu
+
+   Type this in the message box:
+
+       /reload-plugins
+
+   `/playlist:<name>` then appears whenever you type `/playlist`. Skip it and it shows up in your next session instead. Only you can run this command. I can't type it for you.
+   ```
 
 ## Edit
 
@@ -86,7 +95,7 @@ Question "What do you want to do with your playlists?", header "Action":
    |---|---|
    | Add skills | Create steps 2 and 3, show what you gathered as in the Review step, then `add <name> <id> ...`. "From this conversation" is `add <name> --session ${CLAUDE_SESSION_ID}`. |
    | Remove skills | Run `show <name>`, let them pick from its skills (see "Picking from a list"), then `remove <name> <id> ...`. |
-   | Rename it | Ask for the name as in Create step 1, then `rename <name> <new-name>`. Finish as in Create step 6, because the renamed playlist also needs `/reload-plugins` to reach the slash menu. |
+   | Rename it | Ask for the name as in Create step 1, then `rename <name> <new-name>`. End with the reload call-out from Create step 7, because the renamed playlist also needs `/reload-plugins` to reach the slash menu. |
    | Change description | Offer two short descriptions; they type their own under "Other", reduced as described above. Then `set <name> -d '<text>'`. |
 
    Typed requests under "Other": "load only what a request needs" is `set <name> --mode pick`; "load every skill" is `set <name> --mode all`; "load it automatically when ..." is `set <name> --auto '<when>'` with the text reduced as described above, and `--no-auto` turns that off.
