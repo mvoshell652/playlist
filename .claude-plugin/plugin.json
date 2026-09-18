@@ -1,7 +1,7 @@
 {
   "name": "playlist",
   "version": "0.6.4",
-  "description": "Skill playlists. Type /playlist to create and edit them, and /playlist:<name> to load one.",
+  "description": "Skill playlists for Claude Code. Type /playlist to create and edit them, and /playlist:<name> to load one. Install with the one-line script in the README. A /plugin marketplace install does not work for this tool.",
   "author": {
     "name": "Matthew Voshell"
   },
