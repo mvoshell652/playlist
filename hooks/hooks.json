@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/playlists.py\" hook",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/bin/playlists\" hook",
             "timeout": 5
           }
         ]
