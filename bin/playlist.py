@@ -85,7 +85,7 @@ def ensure_manifest(root):
     if os.path.exists(path):
         return
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         json.dump({"name": NAMESPACE, "version": "1.0.0",
                    "description": "Skill playlists shared with this project. Type /playlist: to pick one."}, fh, indent=2)
         fh.write("\n")
@@ -123,7 +123,7 @@ def load_file(path):
     """A playlist's name is its folder. Anything in the file that fails validation is dropped, not passed on."""
     name = check_name(os.path.basename(os.path.dirname(path)))
     try:
-        with open(path) as fh:
+        with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
     except (OSError, ValueError) as e:
         raise PlaylistError(f"Could not read {path}: {e}")
@@ -286,7 +286,7 @@ def remove_playlist(pl):
 def read_description(path):
     """Description from SKILL.md frontmatter; handles plain, quoted and folded (> or |) values."""
     try:
-        with open(path, errors="ignore") as fh:
+        with open(path, errors="ignore", encoding="utf-8") as fh:
             head = fh.read(6000).replace("\r\n", "\n")
     except OSError:
         return ""
@@ -348,7 +348,7 @@ def skill_index(cwd=None):
         for path in glob.glob(os.path.join(base, "*.md")) if base else []:
             add(os.path.basename(path)[:-3], path, inside)
     try:
-        with open(os.path.join(config_dir(), "plugins", "installed_plugins.json")) as fh:
+        with open(os.path.join(config_dir(), "plugins", "installed_plugins.json"), encoding="utf-8") as fh:
             plugins = json.load(fh).get("plugins", {})
     except (OSError, ValueError, AttributeError):
         plugins = {}
@@ -390,7 +390,7 @@ def transcript_turns(path, known=None):
     isMeta user lines, so a user line opens a new turn only after the assistant has replied.
     """
     cur, cwd, replied = [], None, False
-    with open(path, errors="ignore") as fh:
+    with open(path, errors="ignore", encoding="utf-8") as fh:
         for line in fh:
             if '"user"' not in line and '"assistant"' not in line:  # cheap skip before parsing; spacing-agnostic
                 continue
@@ -510,7 +510,7 @@ def suggest(min_support=3, min_size=2, threshold=0.8, core_share=0.7, cwd=None):
 
 def load_state():
     try:
-        with open(os.path.join(personal_root(), ".state.json")) as fh:
+        with open(os.path.join(personal_root(), ".state.json"), encoding="utf-8") as fh:
             state = json.load(fh)
         return state if isinstance(state, dict) else {}
     except (OSError, ValueError):
@@ -519,7 +519,7 @@ def load_state():
 
 def save_state(state):
     os.makedirs(personal_root(), exist_ok=True)
-    with open(os.path.join(personal_root(), ".state.json"), "w") as fh:
+    with open(os.path.join(personal_root(), ".state.json"), "w", encoding="utf-8") as fh:
         json.dump(state, fh, indent=2)
 
 
@@ -748,7 +748,7 @@ def cmd_sync(a):
     for path in sorted(glob.glob(os.path.join(legacy, "*.json"))):
         name = os.path.basename(path)[:-5]
         try:
-            with open(path) as fh:
+            with open(path, encoding="utf-8") as fh:
                 old = json.load(fh)
             if NAME_RE.match(name) and name not in all_playlists() and isinstance(old.get("skills"), list):
                 write_playlist(name, [s for s in old["skills"] if isinstance(s, str) and SKILL_RE.match(s)],
@@ -832,6 +832,9 @@ def main(argv=None):
     sub.add_parser("sync", help="regenerate every playlist's SKILL.md").set_defaults(fn=cmd_sync)
 
     args = ap.parse_args(argv)
+    # Skill descriptions are UTF-8. A Windows console defaults to cp1252 and would crash on the first accent.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     try:
         args.fn(args)
     except PlaylistError as e:

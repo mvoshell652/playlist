@@ -1,0 +1,36 @@
+name: Something is not working
+description: A playlist did not load, the menu got stuck, or the tool printed an error
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you typed, what you expected, and what you got instead. A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of doctor
+      description: "Run this and paste what it prints: `sh ~/.claude/skills/playlist/bin/playlist doctor`"
+      render: text
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where you run Claude Code
+      options:
+        - Terminal
+        - Desktop app
+        - VS Code or JetBrains
+        - Web or cloud session
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "Operating system, `claude --version`, and `python3 --version`"
+      placeholder: "macOS 15, Claude Code 2.1.228, Python 3.12"
+    validations:
+      required: true
