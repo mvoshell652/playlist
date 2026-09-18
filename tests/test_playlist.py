@@ -238,7 +238,10 @@ class ManageTests(Sandbox):
         with open(os.path.join(ROOT, "SKILL.md")) as fh:
             menu = fh.read()
         self.assertIn("| Play it now |", menu)
-        self.assertIn("You cannot run that command for them", menu)
+        self.assertIn("### One step left: add it to your / menu", menu)
+        self.assertIn("I can't type it for you", menu)
+        callout = menu.index("### One step left")
+        self.assertLess(menu.index("| Play it now |"), callout)  # the call-out comes after the question, so it is seen last
         self.assertIn("## Playing a playlist from here", menu)
 
     def test_a_single_skill_is_not_called_skills(self):
