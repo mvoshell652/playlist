@@ -28,9 +28,23 @@ Claude Code has no saved group of skills. Typing `/a /b /c` stacks six at most a
 d=$(mktemp -d) && git clone --depth 1 https://github.com/mvoshell652/playlist "$d" && sh "$d/install.sh"
 ```
 
-This copies the tool into `~/.claude/skills/playlist/`. Run the same command again to update; your playlists are never touched. Start a new Claude Code session afterwards.
+Then start a new Claude Code session and type `/playlist`.
 
-Needs Python 3.8 or newer on PATH as `python3`, `python` or `py`. No other dependencies. To uninstall, delete `~/.claude/skills/playlist/`.
+The script copies the tool into `~/.claude/skills/playlist/`. It needs Python 3.8 or newer on PATH as `python3`, `python` or `py`, and nothing else. It works in the terminal, the desktop app and the IDE extensions, because they share that folder.
+
+**Update:** run the same line again. Your playlists are never touched.
+
+**Uninstall:** delete the folder. This also deletes your playlists, so copy `skills/` out first if you want to keep them.
+
+```
+rm -rf ~/.claude/skills/playlist
+```
+
+### Why this is not a `/plugin install`
+
+Claude Code copies a marketplace plugin into a versioned cache folder and replaces that folder on every update. Your playlists live inside the tool's folder, because that is what makes them show up as `/playlist:<name>`, so a marketplace update would delete them. A marketplace plugin also cannot register a bare command: installed that way, `/playlist` itself disappears and only `/playlist:<name>` remains.
+
+A plugin that sits in your skills directory is loaded in place, keeps its files, and gets both the bare command and the namespaced ones. That is a documented Claude Code feature ([skills-directory plugins](https://code.claude.com/docs/en/plugins-reference#skills-directory-plugins)), and it is the only layout that does everything this tool needs.
 
 ## Create and edit playlists
 
@@ -85,9 +99,9 @@ A generated `SKILL.md` is static text that tells Claude which skills to load. Pl
 - A playlist only plays when you call it. You can let Claude load one on its own by giving it a rule such as "working on Swift code".
 - A playlist does not make skills cheaper. Loading 20 skills costs the same context either way; `pick` is the only mode that loads less.
 
-### Share with a team
+### Share with a team (experimental)
 
-Ask `/playlist` to share a playlist with your team and it writes the playlist to `<repo>/.claude/skills/playlist/`. Commit it, and everyone who opens the repo gets `/playlist:<name>` without installing anything. Claude Code loads project plugins only after the workspace trust prompt, and only from the folder the session starts in.
+Ask `/playlist` to share a playlist with your team and it writes the playlist to `<repo>/.claude/skills/playlist/`, which you can commit. Claude Code loads a plugin from a project's skills folder only after the workspace trust prompt, and only from the folder the session starts in. Running a personal and a project copy of the `playlist` plugin side by side has not been tested yet, so treat this as a preview.
 
 ### Safety
 
@@ -101,3 +115,7 @@ sh bin/playlist --help
 ```
 
 `PLAYLISTS_HOME` and `CLAUDE_CONFIG_DIR` redirect where playlists and skills are looked up, which keeps experiments away from your real `~/.claude`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
