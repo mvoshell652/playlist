@@ -1,0 +1,47 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest Python the README promises, where a runner still ships it, and the newest everywhere.
+          - { os: ubuntu-22.04, python: "3.8" }
+          - { os: windows-latest, python: "3.8" }
+          - { os: ubuntu-latest, python: "3.13" }
+          - { os: macos-latest, python: "3.13" }
+          - { os: windows-latest, python: "3.13" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: The launcher finds Python and runs
+        shell: bash
+        run: |
+          sh bin/playlist --help > /dev/null
+          export CLAUDE_CONFIG_DIR="$RUNNER_TEMP/claude"
+          sh bin/playlist new smoke some-skill other-skill -d "Smoke test"
+          sh bin/playlist list | grep -q "/playlist:smoke"
+          grep -q "Loading 2 skills" "$CLAUDE_CONFIG_DIR/skills/playlist/skills/smoke/SKILL.md"
+      - name: The installer works from a clean checkout
+        shell: bash
+        run: |
+          export CLAUDE_CONFIG_DIR="$RUNNER_TEMP/claude-install"
+          sh install.sh
+          test -f "$CLAUDE_CONFIG_DIR/skills/playlist/SKILL.md"
+          test -f "$CLAUDE_CONFIG_DIR/skills/playlist/.claude-plugin/plugin.json"
+          sh "$CLAUDE_CONFIG_DIR/skills/playlist/bin/playlist" doctor
