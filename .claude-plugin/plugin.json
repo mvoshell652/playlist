@@ -1,6 +1,6 @@
 {
   "name": "playlist",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "Skill playlists. Type /playlist to create and edit them, and /playlist:<name> to load one.",
   "author": {
     "name": "Matthew Voshell"
@@ -9,5 +9,8 @@
     "skills",
     "playlist",
     "workflow"
-  ]
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/mvoshell652/playlist",
+  "repository": "https://github.com/mvoshell652/playlist"
 }
