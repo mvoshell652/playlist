@@ -207,6 +207,12 @@ class ManageTests(Sandbox):
         self.run_cli("new", "kit", "a", "b", "-d", "Two things")
         self.assertRegex(self.run_cli("list"), r"/playlist:kit\s+2 skills\s+personal\s+all\s+Two things")
 
+    def test_a_single_skill_is_not_called_skills(self):
+        out = self.run_cli("new", "solo", "a") + self.run_cli("list") + self.run_cli("delete", "solo")
+        self.assertNotIn("1 skills", out)
+        self.assertIn("with 1 skill in", out)
+        self.assertIn("(1 skill)", out)
+
     def test_new_and_add_warn_about_ids_that_are_not_installed(self):
         skill(self.config, "real")
         self.assertIn("Not found on disk: typo-skill", self.run_cli("new", "kit", "real", "typo-skill"))
