@@ -124,9 +124,9 @@ class SlashMenuTests(Sandbox):
         self.run_cli("new", "swift", "swiftui-pro", "swiftui-liquid-glass", "swiftui-ui-patterns", "swift-testing",
                      "swift-concurrency", "swift-best-practices:swift-best-practices", "supabase", "-d", "Swift pass.")
         desc = pl.menu_description(pl.get_playlist("swift")).replace(pl.NB_HYPHEN, "-")
-        self.assertEqual(desc, "Swift pass. 7 skills. swiftui: pro, liquid-glass, ui-patterns. "
-                               "swift: testing, concurrency, best-practices. Also: supabase.")
-        self.assertEqual(desc.count("swiftui"), 1)
+        self.assertEqual(desc, "Swift pass. 7 skills. SWIFTUI: pro, liquid-glass, ui-patterns. "
+                               "SWIFT: testing, concurrency, best-practices. ALSO: supabase.")
+        self.assertEqual(desc.lower().count("swiftui"), 1)
 
     def test_two_plugins_with_a_same_named_skill_keep_their_full_ids(self):
         self.run_cli("new", "kit", "one:lint", "two:lint", "solo:format")
@@ -142,7 +142,7 @@ class SlashMenuTests(Sandbox):
     def test_a_skill_named_like_its_family_and_two_ids_with_one_short_name_stay_distinct(self):
         self.run_cli("new", "nuxt", "nuxt", "nuxt-v4:nuxt-core", "nuxt-v5:nuxt-core", "nuxt-data")
         desc = pl.menu_description(pl.get_playlist("nuxt")).replace(pl.NB_HYPHEN, "-")
-        self.assertEqual(desc, "4 skills. nuxt: nuxt, core, nuxt-v5:nuxt-core, data.")
+        self.assertEqual(desc, "4 skills. NUXT: nuxt, core, nuxt-v5:nuxt-core, data.")
 
     def test_menu_description_stays_within_the_spec_limit_and_says_how_many_are_left_out(self):
         ids = [f"a-rather-long-skill-name-number-{i:03}" for i in range(80)]
