@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .DS_Store
+# Your own playlists live here once installed; they are yours, not part of the tool.
+/skills/*/
+/.state.json
