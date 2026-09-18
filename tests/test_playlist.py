@@ -228,6 +228,19 @@ class ManageTests(Sandbox):
         self.run_cli("new", "kit", "a", "b", "-d", "Two things")
         self.assertRegex(self.run_cli("list"), r"/playlist:kit\s+2 skills\s+personal\s+all\s+Two things")
 
+    def test_creating_and_renaming_say_how_to_reach_the_menu_and_how_to_play_now(self):
+        for out in (self.run_cli("new", "kit", "a"), self.run_cli("rename", "kit", "fresh")):
+            self.assertIn("/reload-plugins", out)
+            self.assertIn("plays it right now", out)
+        self.assertIn("`/playlist kit`", self.run_cli("rename", "fresh", "kit"))
+
+    def test_the_menu_ends_a_create_with_play_it_now_and_never_claims_to_reload(self):
+        with open(os.path.join(ROOT, "SKILL.md")) as fh:
+            menu = fh.read()
+        self.assertIn("| Play it now |", menu)
+        self.assertIn("You cannot run that command for them", menu)
+        self.assertIn("## Playing a playlist from here", menu)
+
     def test_a_single_skill_is_not_called_skills(self):
         out = self.run_cli("new", "solo", "a") + self.run_cli("list") + self.run_cli("delete", "solo")
         self.assertNotIn("1 skills", out)

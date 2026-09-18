@@ -54,7 +54,7 @@ If you already know what you want, say it and the menu skips ahead:
 /playlist delete review
 ```
 
-Adding or removing a skill takes effect in the current session. A new, renamed or deleted playlist appears in the `/` menu from your next session.
+Adding or removing a skill takes effect in the current session. When you create a playlist, the menu ends by offering to **play it now**, which loads its skills into the conversation straight away. To see a new or renamed playlist in the `/` menu without waiting for your next session, type `/reload-plugins`; Claude Code reserves that command for you, so the tool cannot run it on your behalf.
 
 ## How it works
 

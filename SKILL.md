@@ -15,7 +15,7 @@ The user's input: $ARGUMENTS
 - AskUserQuestion limits: 2 to 4 options per question, at most 4 questions per call, headers of 12 characters or fewer. The user can always type their own answer under "Other", so never add an "Other" option yourself.
 - A question needs at least two real choices. When only one applies, do not ask: take it and say in one line what you did.
 - If the user's input already answers a step ("add swiftdata to swift"), skip that step. Ask only for what is still missing.
-- If the input starts with the name of an existing playlist, they want to play it, and the rest of the input is their request. Run `show <name>`, which prints the playlist's folder, read the `SKILL.md` in that folder and follow it with that request. This is how a playlist created earlier in this session is used before it reaches the slash menu. Do not start the menu.
+- If the input starts with the name of an existing playlist, they want to play it, and the rest of the input is their request. Play it as described under "Playing a playlist from here". Do not start the menu.
 - If the user names a different playlist or changes their mind part way, treat that as a fresh answer to the step it belongs to and carry on from there.
 - Do the work with the bundled CLI, run through the Bash tool:
 
@@ -63,7 +63,19 @@ Question "What do you want to do with your playlists?", header "Action":
    - **From my history:** question "Which set?", header "History", one option per suggestion (label: a short name you propose; description: how many skills and how often they were loaded together). Choosing one takes all of its skills. With a single suggestion, offer it against "I'll type them".
 4. **Review.** Show the chosen skills as numbered text, one per line with a few words on what each is for. Mark with "(my pick)" every skill you chose between several candidates, and name the runner-up so they can swap it. Question "Create /playlist:<name> with these N skills?", header "Confirm", options "Create it", "Add more skills", "Remove some", "Start over". "Add more skills" returns to step 2 and keeps what is chosen. "Remove some" lets them pick from the chosen skills (see "Picking from a list"), then returns here. They can also type a change under "Other", such as "swap shadcn-ui for shadcn-vue" or "drop the testing ones".
 5. Run `new <name> <id> [<id> ...] -d '<description>'`. Write the description yourself: six words or fewer on what the set is for, using only letters, digits and spaces. Add `--project` only if the user asked to share the playlist with their team.
-6. Tell the user it is ready, and give them both ways to use it, as the command printed: `/playlist <name> <request>` works right now in this session, and `/playlist:<name>` appears in the slash menu after `/reload-plugins` or in their next session.
+6. **Finish.** Say the playlist is ready in one line, then put this on a line of its own so it is easy to copy:
+
+       /reload-plugins
+
+   and explain in one sentence that typing it adds `/playlist:<name>` to the slash menu now, and that otherwise it appears in their next session. You cannot run that command for them; only the user can type it.
+7. **What next.** Question "Your playlist is ready. What next?", header "Next":
+
+   | Option | Description |
+   |---|---|
+   | Play it now | Load its N skills into this conversation right away |
+   | Done | Close the menu |
+
+   On "Play it now", play it as described under "Playing a playlist from here". If they type a request under "Other", play it with that request.
 
 ## Edit
 
@@ -74,7 +86,7 @@ Question "What do you want to do with your playlists?", header "Action":
    |---|---|
    | Add skills | Create steps 2 and 3, show what you gathered as in the Review step, then `add <name> <id> ...`. "From this conversation" is `add <name> --session ${CLAUDE_SESSION_ID}`. |
    | Remove skills | Run `show <name>`, let them pick from its skills (see "Picking from a list"), then `remove <name> <id> ...`. |
-   | Rename it | Ask for the name as in Create step 1, then `rename <name> <new-name>`. |
+   | Rename it | Ask for the name as in Create step 1, then `rename <name> <new-name>`. Finish as in Create step 6, because the renamed playlist also needs `/reload-plugins` to reach the slash menu. |
    | Change description | Offer two short descriptions; they type their own under "Other", reduced as described above. Then `set <name> -d '<text>'`. |
 
    Typed requests under "Other": "load only what a request needs" is `set <name> --mode pick`; "load every skill" is `set <name> --mode all`; "load it automatically when ..." is `set <name> --auto '<when>'` with the text reduced as described above, and `--no-auto` turns that off.
@@ -89,6 +101,10 @@ Question "What do you want to do with your playlists?", header "Action":
 ## See my playlists
 
 Run `list` and show the result as a table. If they want to look inside one, run `show <name>`. If a skill shows as not found, run `doctor` and explain what it reports.
+
+## Playing a playlist from here
+
+A playlist created in this session is not in the slash menu until the user reloads plugins, but it can always be played from this menu. Run `show <name>`, which prints the playlist's folder. Read the `SKILL.md` in that folder and follow it exactly, including its "Loading N skills" line and its loaded count, using the user's request if they gave one. With no request, stop after the loaded count.
 
 ## Turning words into skills
 
