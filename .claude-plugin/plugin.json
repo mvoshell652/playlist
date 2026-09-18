@@ -1,0 +1,8 @@
+{
+  "name": "playlists",
+  "displayName": "Skill Playlists",
+  "version": "0.1.0",
+  "description": "Save any set of skills as a named playlist and load them all with one reference: /playlists:play swift, or @@swift anywhere in a message.",
+  "author": { "name": "Matthew Voshell" },
+  "keywords": ["skills", "playlists", "collections", "workflow"]
+}

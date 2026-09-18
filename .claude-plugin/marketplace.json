@@ -1,0 +1,11 @@
+{
+  "name": "skill-playlists",
+  "owner": { "name": "Matthew Voshell" },
+  "plugins": [
+    {
+      "name": "playlists",
+      "source": "./",
+      "description": "Save any set of skills as a named playlist and load them all with one reference."
+    }
+  ]
+}
