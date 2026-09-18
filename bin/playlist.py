@@ -34,8 +34,8 @@ CMD_RE = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
 MODES = ("all", "pick")
 # Skills the harness loads for its own purposes; nobody picks these, so they are noise in a mined playlist.
 HARNESS_SKILLS = {"artifact-design", "artifact-capabilities", "artifact-diagramming", "workflow-authoring"}
-MENU_NOTE = ("It shows up in the / menu as /{ns}:{name} from your next session "
-             "(in the terminal, /reload-plugins may pick it up sooner).")
+MENU_NOTE = ("Use it right now with `/{ns} {name}` followed by your request. It joins the /{ns}: list in the "
+             "slash menu after you run /reload-plugins, or in your next session.")
 
 
 class PlaylistError(Exception):

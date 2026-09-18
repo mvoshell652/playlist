@@ -15,7 +15,7 @@ The user's input: $ARGUMENTS
 - AskUserQuestion limits: 2 to 4 options per question, at most 4 questions per call, headers of 12 characters or fewer. The user can always type their own answer under "Other", so never add an "Other" option yourself.
 - A question needs at least two real choices. When only one applies, do not ask: take it and say in one line what you did.
 - If the user's input already answers a step ("add swiftdata to swift"), skip that step. Ask only for what is still missing.
-- If the input is nothing but the name of an existing playlist, they want to play it. Run `show <name>`, which prints the playlist's folder, read the `SKILL.md` in that folder and follow it. Mention that `/playlist:<name>` does this directly.
+- If the input starts with the name of an existing playlist, they want to play it, and the rest of the input is their request. Run `show <name>`, which prints the playlist's folder, read the `SKILL.md` in that folder and follow it with that request. This is how a playlist created earlier in this session is used before it reaches the slash menu. Do not start the menu.
 - If the user names a different playlist or changes their mind part way, treat that as a fresh answer to the step it belongs to and carry on from there.
 - Do the work with the bundled CLI, run through the Bash tool:
 
@@ -63,7 +63,7 @@ Question "What do you want to do with your playlists?", header "Action":
    - **From my history:** question "Which set?", header "History", one option per suggestion (label: a short name you propose; description: how many skills and how often they were loaded together). Choosing one takes all of its skills. With a single suggestion, offer it against "I'll type them".
 4. **Review.** Show the chosen skills as numbered text, one per line with a few words on what each is for. Mark with "(my pick)" every skill you chose between several candidates, and name the runner-up so they can swap it. Question "Create /playlist:<name> with these N skills?", header "Confirm", options "Create it", "Add more skills", "Remove some", "Start over". "Add more skills" returns to step 2 and keeps what is chosen. "Remove some" lets them pick from the chosen skills (see "Picking from a list"), then returns here. They can also type a change under "Other", such as "swap shadcn-ui for shadcn-vue" or "drop the testing ones".
 5. Run `new <name> <id> [<id> ...] -d '<description>'`. Write the description yourself: six words or fewer on what the set is for, using only letters, digits and spaces. Add `--project` only if the user asked to share the playlist with their team.
-6. Tell the user it is ready as `/playlist:<name>`, and repeat the note the command printed about when it appears in the / menu.
+6. Tell the user it is ready, and give them both ways to use it, as the command printed: `/playlist <name> <request>` works right now in this session, and `/playlist:<name>` appears in the slash menu after `/reload-plugins` or in their next session.
 
 ## Edit
 
