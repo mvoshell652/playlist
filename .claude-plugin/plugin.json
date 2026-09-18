@@ -1,8 +1,8 @@
 {
   "name": "playlists",
   "displayName": "Skill Playlists",
-  "version": "0.2.0",
-  "description": "Skill playlists: group any installed skills under one name, then type /playlist: and pick one to load them all. Manage with /playlists:new, add, remove, delete, list and suggest.",
+  "version": "0.3.0",
+  "description": "Skill playlists: group any installed skills under one name, then type /playlist: and pick one to load them all. Create, edit and delete playlists from one guided menu, /playlists:manage.",
   "author": {
     "name": "Matthew Voshell"
   },

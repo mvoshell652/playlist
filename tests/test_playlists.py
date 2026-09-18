@@ -75,6 +75,15 @@ class SlashMenuTests(Sandbox):
             self.assertEqual(json.load(fh)["name"], "playlist")
         self.assertTrue(os.path.exists(os.path.join(self.home, "skills", "swift", "SKILL.md")))
 
+    def test_manifest_is_refreshed_when_this_tool_changes_it(self):
+        self.run_cli("new", "swift", "a")
+        path = os.path.join(self.home, ".claude-plugin", "plugin.json")
+        with open(path, "w") as fh:
+            fh.write('{"name": "playlist", "description": "old"}')
+        self.run_cli("add", "swift", "b")
+        with open(path) as fh:
+            self.assertIn("/playlists:manage", json.load(fh)["description"])
+
     def test_generated_skill_has_valid_frontmatter_and_a_menu_description(self):
         self.run_cli("new", "swift", "a", "b", "-d", 'Full "Swift": pass')
         text = self.skill_md("swift")
@@ -336,6 +345,12 @@ class TranscriptTests(Sandbox):
         out = self.run_cli("new", "mine", "--session", "s1")
         self.assertIn("   1. swiftui-pro\n   2. supabase:supabase\n   3. swift-testing", self.skill_md("mine"))
         self.assertIn("Created playlist 'mine' with 3 skills", out)  # harness, playlist and sidechain skills excluded
+
+    def test_loaded_previews_a_capture_without_creating_anything(self):
+        self.write_session("s1", [line("user", "go"), skill_call("a"), skill_call("workflow-authoring"), skill_call("b")])
+        out = self.run_cli("loaded", "--session", "s1")
+        self.assertIn("2 skills loaded in this conversation:\n   1. a\n   2. b", out)
+        self.assertFalse(os.path.exists(self.home))
 
     def test_new_from_session_with_nothing_loaded_explains_itself(self):
         self.write_session("s1", [line("user", "hello")])
