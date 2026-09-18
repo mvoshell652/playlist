@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Skill playlists for Claude Code: a named list of skills that one reference loads.
+"""Skill playlists for Claude Code: a named list of skills that one slash command loads.
 
-A playlist is a small JSON file. `catalog` and `play` print the text that reaches
-the model; everything else manages the files. Standard library only, so the
-plugin has no install step.
+Every playlist is a real skill inside a skills-directory plugin named `playlist`:
 
-Two rules shape the design:
+    ~/.claude/skills/playlist/.claude-plugin/plugin.json
+    ~/.claude/skills/playlist/skills/<name>/playlist.json   the playlist (source of truth)
+    ~/.claude/skills/playlist/skills/<name>/SKILL.md        generated from it
 
-* Playlists are data read at play time, never generated skills. A running session
-  does not see skill files created after it started, but it always sees a JSON
-  file written a second ago.
-* Nothing a user types is ever placed on a shell command line, and nothing read
-  from a playlist file reaches the model unless it matches a strict pattern.
-  Project playlists are committed and shared, so their contents are untrusted.
+Claude Code namespaces a plugin's skills by the plugin name, so typing `/playlist:`
+autocompletes to every playlist, exactly like any other command. The generated
+SKILL.md is static text: no shell runs when a playlist is played.
+
+Standard library only, so the plugin has no install step. Anything read from a
+playlist file is validated before it is written into a SKILL.md, because project
+playlists are committed and shared.
 """
 import argparse
 import collections
@@ -21,21 +22,18 @@ import itertools
 import json
 import os
 import re
+import shutil
 import sys
 
+NAMESPACE = "playlist"
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 SKILL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(?::[A-Za-z0-9][A-Za-z0-9._-]{0,63})?$")
-TOKEN_RE = re.compile(r"(?<![\w@])@@([a-z0-9][a-z0-9_-]{0,47})(?::(invoke|inline|index))?(?![\w-])")
-CODE_RE = re.compile(r"```.*?(?:```|\Z)|`[^`\n]*`", re.S)
 CMD_RE = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
-MODES = ("invoke", "inline", "index")
-# Bash tool output is shown inline up to 30,000 characters; stay well under it, wrappers included.
-INLINE_BUDGET = 24000
-CATALOG_BUDGET = 20000
-# A hook may add at most 10,000 characters of context.
-HOOK_BUDGET = 9500
+MODES = ("all", "pick")
 # Skills the harness loads for its own purposes; nobody picks these, so they are noise in a mined playlist.
 HARNESS_SKILLS = {"artifact-design", "artifact-capabilities", "artifact-diagramming", "workflow-authoring"}
+MENU_NOTE = ("It shows up in the / menu as /{ns}:{name} from your next session "
+             "(in the terminal, /reload-plugins may pick it up sooner).")
 
 
 class PlaylistError(Exception):
@@ -48,8 +46,8 @@ def config_dir():
     return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 
 
-def global_dir():
-    return os.environ.get("PLAYLISTS_HOME") or os.path.join(config_dir(), "playlists")
+def personal_root():
+    return os.environ.get("PLAYLISTS_HOME") or os.path.join(config_dir(), "skills", NAMESPACE)
 
 
 def project_root(start=None):
@@ -65,12 +63,28 @@ def project_root(start=None):
         cur = parent
 
 
-def project_dir(cwd=None):
+def project_plugin_root(cwd=None):
     root = project_root(cwd)
-    return os.path.join(root, ".claude", "playlists") if root else None
+    return os.path.join(root, ".claude", "skills", NAMESPACE) if root else None
+
+
+def ensure_manifest(root):
+    path = os.path.join(root, ".claude-plugin", "plugin.json")
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            json.dump({"name": NAMESPACE, "version": "1.0.0",
+                       "description": "Your skill playlists. Type /playlist: to pick one. Managed with /playlists:new, "
+                                      "/playlists:add, /playlists:remove and /playlists:delete."}, fh, indent=2)
+            fh.write("\n")
 
 
 # ---------------------------------------------------------------- playlists
+
+def one_line(text, limit=120):
+    text = "".join(ch if ch.isprintable() else " " for ch in str(text or ""))
+    return re.sub(r"\s+", " ", text).strip()[:limit]
+
 
 def check_name(name):
     if not NAME_RE.match(name or ""):
@@ -84,17 +98,14 @@ def check_skills(skills):
     if bad:
         raise PlaylistError(f"Not a skill id: {', '.join(repr(one_line(s, 60)) for s in bad)}. "
                             f"Ids look like swiftui-pro or supabase:supabase. Run `skills <word>` to find one.")
+    if any(s.startswith(NAMESPACE + ":") for s in skills):
+        raise PlaylistError("A playlist cannot contain another playlist. List the skills themselves.")
     return list(dict.fromkeys(skills))
 
 
-def one_line(text, limit=120):
-    text = "".join(ch if ch.isprintable() else " " for ch in str(text or ""))
-    return re.sub(r"\s+", " ", text).strip()[:limit]
-
-
 def load_file(path):
-    """A playlist's name is its filename. Anything in the file that fails validation is dropped, not passed on."""
-    name = check_name(os.path.basename(path)[:-5])
+    """A playlist's name is its folder. Anything in the file that fails validation is dropped, not passed on."""
+    name = check_name(os.path.basename(os.path.dirname(path)))
     try:
         with open(path) as fh:
             data = json.load(fh)
@@ -103,19 +114,18 @@ def load_file(path):
     raw = data.get("skills", []) if isinstance(data, dict) else None
     if not isinstance(raw, list):
         raise PlaylistError(f"{path} is not a playlist: expected an object with a \"skills\" list.")
-    valid = [s for s in raw if isinstance(s, str) and SKILL_RE.match(s)]
+    valid = [s for s in raw if isinstance(s, str) and SKILL_RE.match(s) and not s.startswith(NAMESPACE + ":")]
     return {"name": name, "description": one_line(data.get("description")),
-            "mode": data.get("mode") if data.get("mode") in MODES else "invoke",
+            "mode": data.get("mode") if data.get("mode") in MODES else "all",
+            "auto_when": one_line(data.get("auto_when"), 200),
             "skills": list(dict.fromkeys(valid)), "rejected": len(raw) - len(valid), "path": path}
 
 
 def all_playlists(cwd=None, problems=None):
-    """name -> playlist. A project playlist shadows a personal one with the same filename."""
+    """name -> playlist. A project playlist shadows a personal one with the same name."""
     found = {}
-    for scope, d in (("personal", global_dir()), ("project", project_dir(cwd))):
-        if not d or not os.path.isdir(d):
-            continue
-        for path in sorted(glob.glob(os.path.join(d, "*.json"))):
+    for scope, root in (("personal", personal_root()), ("project", project_plugin_root(cwd))):
+        for path in sorted(glob.glob(os.path.join(root, "skills", "*", "playlist.json"))) if root else []:
             try:
                 pl = load_file(path)
             except PlaylistError as e:
@@ -129,30 +139,81 @@ def all_playlists(cwd=None, problems=None):
 
 def get_playlist(name, cwd=None):
     lists = all_playlists(cwd)
+    name = name[len(NAMESPACE) + 1:] if name.startswith(NAMESPACE + ":") else name
     if name not in lists:
-        hint = " That looks like a skill id; this command takes a playlist name." if ":" in name else ""
-        raise PlaylistError(f"No playlist named '{one_line(name, 60)}'.{hint} "
+        raise PlaylistError(f"No playlist named '{one_line(name, 60)}'. "
                             f"Playlists: {', '.join(sorted(lists)) or 'none yet'}.")
     return lists[name]
 
 
-def write_playlist(name, skills, description="", mode="invoke", project=False, cwd=None, path=None):
-    """Writes to `path` when editing an existing playlist, so an edit never changes its scope or location."""
+def render_skill(pl, index):
+    """The SKILL.md a playlist becomes. Static text only, so playing one never runs a command."""
+    name, skills, n = pl["name"], pl["skills"], len(pl["skills"])
+    summary = f"Playlist · {n} skill{'s' * (n != 1)}" + (f" · {pl['description']}" if pl["description"] else "")
+    front = [f"name: {name}"]
+    if pl["auto_when"]:
+        front += [f"description: {json.dumps(f'{summary}. Use when {pl['auto_when']}.', ensure_ascii=False)}"]
+    else:
+        # Loading many skills unasked is an expensive surprise, so a playlist only plays when the user calls it.
+        front += [f"description: {json.dumps(summary, ensure_ascii=False)}", "disable-model-invocation: true"]
+    front.append('argument-hint: "[your request]"')
+    if pl["mode"] == "pick":
+        rows = "\n".join(f"- {s}" + (f": {read_description(index[s])}" if s in index and read_description(index[s]) else "")
+                         for s in skills)
+        steps = (
+            f"1. Before anything else, tell the user in one line: Loading from playlist \"{name}\" ({n} skills available).\n"
+            f"2. From the list below, choose the skills the user's request actually needs. Call the Skill tool once for "
+            f"each of those, all in a single message so they load in parallel. If there is no request, load nothing and "
+            f"ask what they are working on.\n\n{rows}\n\n"
+            f"3. When the calls return, start your reply with one line: `▶ {name} · loaded <k> of {n} skills`, then list "
+            f"the ones you loaded and name any whose call failed.")
+    else:
+        rows = "\n".join(f"   {i}. {s}" for i, s in enumerate(skills, 1))
+        steps = (
+            f"1. Before anything else, tell the user in one line: Loading {n} skills from playlist \"{name}\".\n"
+            f"2. Call the Skill tool once for each skill below, all in a single message so they load in parallel. Skip "
+            f"a skill only if it was already loaded earlier in this conversation. Do not substitute, summarise or drop "
+            f"any.\n\n{rows}\n\n"
+            f"3. When the calls return, start your reply with one line: `▶ {name} · <loaded>/{n} skills loaded`. Count a "
+            f"skill as loaded only if its Skill call returned the skill's content, and name every skill whose call failed.")
+    return ("---\n" + "\n".join(front) + "\n---\n\n"
+            "<!-- Generated from playlist.json by the playlists plugin. Change it with /playlists:add and "
+            "/playlists:remove; hand edits here are overwritten. -->\n\n"
+            f"This is the \"{name}\" skill playlist: {n} skills that load together.\n\n{steps}\n"
+            f"4. Then carry out the user's request with those skills applied. If the request below is empty, stop after step 3.\n\n"
+            f"The user's request: $ARGUMENTS\n")
+
+
+def write_playlist(name, skills, description="", mode="all", auto_when="", project=False, cwd=None, folder=None):
+    """Writes playlist.json and its SKILL.md. `folder` is given when editing, so an edit never changes scope."""
     check_name(name)
     skills = check_skills(skills)
-    if path is None:
-        d = project_dir(cwd) if project else global_dir()
-        if not d:
+    if folder is None:
+        root = project_plugin_root(cwd) if project else personal_root()
+        if not root:
             raise PlaylistError("Not inside a project (no .git or .claude found), so there is nowhere to save a project playlist.")
-        path = os.path.join(d, name + ".json")
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    body = {"name": name, "description": one_line(description), "mode": mode, "skills": skills}
-    tmp = path + ".tmp"
-    with open(tmp, "w") as fh:
-        json.dump(body, fh, indent=2)
-        fh.write("\n")
-    os.replace(tmp, path)
-    return path
+        folder = os.path.join(root, "skills", name)
+    ensure_manifest(os.path.dirname(os.path.dirname(folder)))
+    os.makedirs(folder, exist_ok=True)
+    pl = {"name": name, "description": one_line(description), "mode": mode if mode in MODES else "all",
+          "auto_when": one_line(auto_when, 200), "skills": skills}
+    for filename, text in (("playlist.json", json.dumps(pl, indent=2) + "\n"),
+                           ("SKILL.md", render_skill(pl, skill_index(cwd) if pl["mode"] == "pick" else {}))):
+        tmp = os.path.join(folder, filename + ".tmp")
+        with open(tmp, "w") as fh:
+            fh.write(text)
+        os.replace(tmp, os.path.join(folder, filename))
+    return folder
+
+
+def remove_playlist(pl):
+    """Deletes only the two files this tool wrote, then the folder if nothing else is in it."""
+    folder = os.path.dirname(pl["path"])
+    for filename in ("playlist.json", "SKILL.md"):
+        if os.path.exists(os.path.join(folder, filename)):
+            os.remove(os.path.join(folder, filename))
+    if not os.listdir(folder):
+        os.rmdir(folder)
 
 
 # ---------------------------------------------------------------- installed skills
@@ -175,12 +236,12 @@ def read_description(path):
             if value in (">", "|", ">-", "|-", ""):
                 block = itertools.takewhile(lambda l: l.startswith((" ", "\t")) or not l.strip(), lines[i + 1:])
                 value = " ".join(l.strip() for l in block if l.strip())
-            return one_line(value.strip("\"'"), 300)
+            return one_line(value.strip("\"'"), 200)
     return ""
 
 
 def readable_skill_file(path, inside=None):
-    """Inline mode pastes file contents into context, so only ever read real markdown files.
+    """Descriptions are copied into generated skills, so only ever read real markdown files.
 
     A repo can plant `.claude/skills/x/SKILL.md` as a symlink to a private file, so project
     skills must resolve inside the project. Personal skill folders are the user's own and
@@ -196,7 +257,7 @@ def readable_skill_file(path, inside=None):
 
 
 def skill_index(cwd=None):
-    """Skill id -> SKILL.md path, for every skill found on disk.
+    """Skill id -> SKILL.md path, for every skill found on disk, playlists excluded.
 
     Skills bundled with Claude Code or synced from claude.ai are not on disk, so a
     miss here means "cannot verify", not "does not exist".
@@ -226,7 +287,7 @@ def skill_index(cwd=None):
         plugins = {}
     for key, installs in plugins.items() if isinstance(plugins, dict) else []:
         for inst in installs if isinstance(installs, list) else []:
-            if isinstance(inst, dict) and inst.get("installPath"):
+            if isinstance(inst, dict) and inst.get("installPath") and not key.startswith("playlists@"):
                 add_dir(os.path.join(inst["installPath"], "skills"), prefix=key.split("@")[0] + ":")
     return index
 
@@ -238,113 +299,6 @@ def not_on_disk(skills, cwd=None):
         return ""
     return (f"\nNot found on disk: {', '.join(missing)}. Built-in and claude.ai-synced skills always show here; "
             f"for anything else check the spelling with `skills <word>`.")
-
-
-def strip_frontmatter(text):
-    if text.startswith("---"):
-        end = text.find("\n---", 3)
-        if end != -1:
-            return text[end + 4:].lstrip("\n")
-    return text
-
-
-# ---------------------------------------------------------------- play
-
-def parse_refs(arg):
-    """'swift+db:index', 'swift, db' -> [('swift', None), ('db', 'index')]. Duplicates collapse."""
-    refs = {}
-    for part in re.split(r"[+,\s]+", arg or ""):
-        if not part:
-            continue
-        name, _, mode = part.partition(":")
-        if mode and mode not in MODES:
-            raise PlaylistError(f"'{one_line(part, 60)}' is not a playlist reference. Write a playlist name, optionally "
-                                f"followed by :inline or :index. Skill ids such as supabase:supabase go inside a playlist.")
-        refs.setdefault(name, mode or None)
-    return list(refs.items())
-
-
-def numbered(skills):
-    return "\n".join(f"{i}. {s}" for i, s in enumerate(skills, 1))
-
-
-INVOKE_RULES = (
-    "Call the Skill tool once per skill, all in a single message so they load in parallel. Skip a skill only if it "
-    "was already loaded earlier in this conversation. Do not substitute, summarise or drop any. When the calls "
-    "return, start your reply with one line, `▶ {label}: <loaded>/{total} loaded`. Count a skill as loaded only if its "
-    "Skill call returned the skill's content, and name every skill whose call failed. Then carry out the user's "
-    "request with all of them applied."
-)
-
-
-def render_invoke(label, skills):
-    return f"Load every skill below now. {INVOKE_RULES.format(label=label, total=len(skills))}\n\n{numbered(skills)}"
-
-
-def render_index(label, skills, index):
-    rows = [f"- {s}: {read_description(index[s]) or '(no description)'}\n  {index[s]}" for s in skills if s in index]
-    unknown = [s for s in skills if s not in index]
-    out = (f"These {len(rows)} skills are available for this request. Read the SKILL.md of each one the request "
-           f"actually touches before you start; you do not need all of them.\n\n" + "\n".join(rows))
-    if unknown:
-        out += "\n\nNot found on disk, so load these with the Skill tool if they are relevant:\n" + numbered(unknown)
-    return out + f"\n\nStart your reply with one line: `▶ {label}: read <n> of {len(skills)}`."
-
-
-def render_inline(label, skills, index):
-    parts, deferred, used = [], [], 0
-    for s in skills:
-        piece = None
-        if s in index:
-            try:
-                with open(index[s], errors="ignore") as fh:
-                    body = strip_frontmatter(fh.read()).rstrip()
-                piece = f"<skill name=\"{s}\" base-directory=\"{os.path.dirname(index[s])}\">\n{body}\n</skill>"
-            except OSError:
-                piece = None
-        if piece is None or used + len(piece) > INLINE_BUDGET:
-            deferred.append(s)
-            continue
-        used += len(piece) + 2
-        parts.append(piece)
-    out = (f"{len(parts)} of {len(skills)} skills are included in full below. Treat each as loaded; relative paths "
-           f"inside a skill resolve against its base-directory.\n\n" + "\n\n".join(parts))
-    if deferred:
-        out += (f"\n\nThese {len(deferred)} did not fit the inline budget or are not on disk. Load them with the "
-                f"Skill tool, all in one message:\n" + numbered(deferred))
-    return out + f"\n\nStart your reply with one line: `▶ {label}: {len(skills)} skills applied`."
-
-
-def render_play(refs, cwd=None):
-    """Text for the model. Several playlists merge into one de-duplicated list; the first explicit mode wins."""
-    refs = list(dict(refs).items()) if refs else []
-    if not refs:
-        raise PlaylistError("Name a playlist, for example `/playlists:play swift`.")
-    lists = [get_playlist(name, cwd) for name, _ in refs]
-    mode = next((m for _, m in refs if m), None) or (lists[0]["mode"] if len(lists) == 1 else "invoke")
-    skills = list(dict.fromkeys(s for pl in lists for s in pl["skills"]))
-    label = "+".join(pl["name"] for pl in lists)
-    if not skills:
-        raise PlaylistError(f"Playlist '{label}' has no valid skills. Add some with `add {lists[0]['name']} <skill>`.")
-    header = f"Skill playlist \"{label}\": {len(skills)} skills, {mode} mode.\n\n"
-    if mode == "invoke":
-        return header + render_invoke(label, skills)
-    return header + (render_index if mode == "index" else render_inline)(label, skills, skill_index(cwd))
-
-
-def render_catalog(cwd=None):
-    """Every playlist with its skills, for the play skill. Takes no input, so nothing typed reaches a shell."""
-    lists = all_playlists(cwd)
-    if not lists:
-        return "There are no skill playlists yet. Offer to create one with the playlists:manage skill."
-    blocks = [f"## {n} ({p['scope']}, {p['mode']} mode, {len(p['skills'])} skills)\n{numbered(p['skills'])}"
-              for n, p in sorted(lists.items())]
-    text = "Skill playlists available here:\n\n" + "\n\n".join(blocks)
-    if len(text) > CATALOG_BUDGET:
-        rows = "\n".join(f"- {n} ({p['scope']}, {p['mode']} mode, {len(p['skills'])} skills)" for n, p in sorted(lists.items()))
-        text = ("Skill playlists available here. There are too many to list in full, so run `play <name>` with the "
-                "Bash tool to get a playlist's skills:\n\n" + rows)
-    return text
 
 
 # ---------------------------------------------------------------- transcripts
@@ -399,10 +353,11 @@ def canonical(skill):
 
 
 def clean(skills):
-    """Drop harness-loaded skills and our own; keep exact ids in first-use order."""
+    """Drop harness-loaded skills, playlists and our own commands; keep exact ids in first-use order."""
     out = []
     for s in skills:
-        if canonical(s) not in HARNESS_SKILLS and not s.startswith("playlists:") and s not in out:
+        ours = s.startswith(("playlists:", NAMESPACE + ":"))
+        if canonical(s) not in HARNESS_SKILLS and not ours and s not in out:
             out.append(s)
     return out
 
@@ -414,7 +369,10 @@ def session_skills(session_id, last=None, cwd=None):
     if not paths:
         raise PlaylistError(f"No transcript found for session {session_id}.")
     turns = [t for t in (clean(t) for _, t in transcript_turns(paths[0], set(skill_index(cwd)))) if t]
-    return clean(itertools.chain.from_iterable(turns[-last:] if last else turns))
+    skills = clean(itertools.chain.from_iterable(turns[-last:] if last else turns))
+    if not skills:
+        raise PlaylistError("No skills were loaded in this conversation yet, so there is nothing to capture.")
+    return skills
 
 
 def jaccard(a, b):
@@ -473,7 +431,7 @@ def suggest(min_support=3, min_size=2, threshold=0.8, core_share=0.7, cwd=None):
 
 def load_state():
     try:
-        with open(os.path.join(global_dir(), ".state.json")) as fh:
+        with open(os.path.join(personal_root(), ".state.json")) as fh:
             state = json.load(fh)
         return state if isinstance(state, dict) else {}
     except (OSError, ValueError):
@@ -481,60 +439,24 @@ def load_state():
 
 
 def save_state(state):
-    os.makedirs(global_dir(), exist_ok=True)
-    with open(os.path.join(global_dir(), ".state.json"), "w") as fh:
+    os.makedirs(personal_root(), exist_ok=True)
+    with open(os.path.join(personal_root(), ".state.json"), "w") as fh:
         json.dump(state, fh, indent=2)
 
 
-# ---------------------------------------------------------------- hook
-
-def run_hook():
-    """UserPromptSubmit: expand @@name tokens. Must never block a prompt, so every failure exits 0 silently."""
-    try:
-        event = json.load(sys.stdin)
-        prompt, cwd = event.get("prompt") or "", event.get("cwd")
-        if "@@" not in prompt:
-            return
-        lists = all_playlists(cwd)
-        # Pasted code is full of @@ (Ruby class variables, diff hunks), so tokens inside code spans never count.
-        refs = dict((n, m or None) for n, m in TOKEN_RE.findall(CODE_RE.sub(" ", prompt)) if n in lists)
-        if not refs:
-            return
-        lead = ("The user's message names a skill playlist with an @@name token. If that token is plainly part of "
-                "pasted code or data and not a request to load skills, ignore this note. ")
-        note = lead + render_play(list(refs.items()), cwd)
-        if len(note) > HOOK_BUDGET:
-            note = lead + render_play([(n, "invoke") for n in refs], cwd)
-        if len(note) > HOOK_BUDGET:
-            names = " ".join(refs)
-            note = lead + (f"Playlist \"{names}\" is too large to list here. Use the playlists:play skill with "
-                           f"\"{names}\" to load it.")
-        json.dump({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": note}}, sys.stdout)
-    except Exception:
-        return
-
-
 # ---------------------------------------------------------------- cli
-
-def cmd_play(a):
-    print(render_play(parse_refs(" ".join(a.ref))))
-
-
-def cmd_catalog(a):
-    print(render_catalog())
-
 
 def cmd_list(a):
     problems = []
     lists = all_playlists(problems=problems)
     if not lists:
-        print("No playlists yet. Create one with `new <name> <skill> [<skill> ...]`, or capture this conversation "
-              "with `save-session`. `skills <word>` finds skill ids.")
+        print("No playlists yet. Create one with `new <name> <skill> [<skill> ...]`, or `new <name> --session <id>` "
+              "to capture the skills loaded in this conversation. `skills <word>` finds skill ids.")
     else:
-        width = max(len(n) for n in lists)
+        width = max(len(n) for n in lists) + len(NAMESPACE) + 2
         print("\n".join(
-            f"{n.ljust(width)}  {len(p['skills']):>3} skills  {p['scope']:<8}  {p['mode']:<6}  {p['description']}".rstrip()
-            for n, p in sorted(lists.items())))
+            f"{('/' + NAMESPACE + ':' + n).ljust(width)}  {len(p['skills']):>3} skills  {p['scope']:<8}  "
+            f"{p['mode']:<4}  {p['description']}".rstrip() for n, p in sorted(lists.items())))
     for p in problems:
         print(f"Skipped: {p}")
 
@@ -542,9 +464,12 @@ def cmd_list(a):
 def cmd_show(a):
     pl = get_playlist(a.name)
     index = skill_index()
-    print(f"{pl['name']} ({pl['scope']}, {pl['mode']} mode) {pl['description']}\n{pl['path']}\n")
-    for s in pl["skills"]:
-        print(f"  {'ok        ' if s in index else 'not found '} {s}")
+    print(f"/{NAMESPACE}:{pl['name']} ({pl['scope']}, loads {pl['mode']}) {pl['description']}")
+    if pl["auto_when"]:
+        print(f"Claude may load it on its own when {pl['auto_when']}.")
+    print(os.path.dirname(pl["path"]) + "\n")
+    for i, s in enumerate(pl["skills"], 1):
+        print(f"  {i:>2}. {s}" + ("" if s in index else "   (not found on disk)"))
     if pl["rejected"]:
         print(f"\n{pl['rejected']} entries in the file are not valid skill ids and are ignored.")
     print(not_on_disk(pl["skills"]).strip())
@@ -555,32 +480,51 @@ def cmd_skills(a):
     words = [w.lower() for w in a.query]
     rows = [(k, read_description(v)) for k, v in sorted(index.items())]
     rows = [(k, d) for k, d in rows if all(w in k.lower() or w in d.lower() for w in words)]
+    rows.sort(key=lambda r: (not all(w in r[0].lower() for w in words), r[0]))  # id matches before description matches
     print(f"{len(rows)} of {len(index)} installed skills" + (f" match '{' '.join(a.query)}'" if words else "") + ":\n")
     for k, d in rows[:a.limit]:
         print(f"{k}  {d[:110]}")
     if len(rows) > a.limit:
-        print(f"\n... {len(rows) - a.limit} more. Narrow it with a word, for example `skills swift`.")
+        print(f"\n... {len(rows) - a.limit} more. Narrow it with another word.")
 
 
 def cmd_new(a):
+    skills = list(a.skills) + (session_skills(a.session, a.last) if a.session else [])
+    if not skills:
+        raise PlaylistError("List the skills for the playlist, or pass --session to capture this conversation's skills.")
     if a.name in all_playlists() and not a.force:
         raise PlaylistError(f"Playlist '{a.name}' already exists. Pass --force to replace it, or use `add`.")
-    path = write_playlist(a.name, a.skills, a.description or "", a.mode, a.project)
-    print(f"Saved '{a.name}' with {len(set(a.skills))} skills to {path}\n"
-          f"Play it with /playlists:play {a.name}, or write @@{a.name} anywhere in a message." + not_on_disk(a.skills))
+    folder = write_playlist(a.name, skills, a.description or "", a.mode, project=a.project)
+    print(f"Created playlist '{a.name}' with {len(set(skills))} skills in {folder}\n"
+          + "\n".join(f"  {i:>2}. {s}" for i, s in enumerate(dict.fromkeys(skills), 1)) + "\n"
+          + MENU_NOTE.format(ns=NAMESPACE, name=a.name) + not_on_disk(skills))
 
 
 def cmd_edit(a):
     pl = get_playlist(a.name)
-    skills = [s for s in pl["skills"] if s not in a.skills] if a.command == "remove" else pl["skills"] + a.skills
-    write_playlist(pl["name"], skills, pl["description"], pl["mode"], path=pl["path"])
-    print(f"'{pl['name']}' now has {len(set(skills))} skills." + (not_on_disk(a.skills) if a.command == "add" else ""))
+    given = list(a.skills) + (session_skills(a.session) if getattr(a, "session", None) else [])
+    if not given:
+        raise PlaylistError("Name at least one skill.")
+    if a.command == "remove":
+        absent = [s for s in given if s not in pl["skills"]]
+        if absent:
+            raise PlaylistError(f"Not in '{pl['name']}': {', '.join(absent)}. It has: {', '.join(pl['skills'])}.")
+        skills = [s for s in pl["skills"] if s not in given]
+        if not skills:
+            raise PlaylistError(f"That would empty '{pl['name']}'. Delete the playlist instead.")
+    else:
+        skills = pl["skills"] + given
+    write_playlist(pl["name"], skills, pl["description"], pl["mode"], pl["auto_when"], folder=os.path.dirname(pl["path"]))
+    changed = len(set(skills)) - len(pl["skills"])
+    print(f"/{NAMESPACE}:{pl['name']} now has {len(set(skills))} skills ({changed:+d}). The change is live in this session."
+          + (not_on_disk(given) if a.command == "add" else ""))
 
 
 def cmd_set(a):
     pl = get_playlist(a.name)
+    auto = "" if a.no_auto else (a.auto if a.auto is not None else pl["auto_when"])
     write_playlist(pl["name"], pl["skills"], a.description if a.description is not None else pl["description"],
-                   a.mode or pl["mode"], path=pl["path"])
+                   a.mode or pl["mode"], auto, folder=os.path.dirname(pl["path"]))
     print(f"Updated '{pl['name']}'.")
 
 
@@ -589,23 +533,17 @@ def cmd_rename(a):
     check_name(a.new_name)
     if a.new_name in all_playlists():
         raise PlaylistError(f"Playlist '{a.new_name}' already exists.")
-    write_playlist(a.new_name, pl["skills"], pl["description"], pl["mode"],
-                   path=os.path.join(os.path.dirname(pl["path"]), a.new_name + ".json"))
-    os.remove(pl["path"])
-    print(f"Renamed '{pl['name']}' to '{a.new_name}'.")
+    write_playlist(a.new_name, pl["skills"], pl["description"], pl["mode"], pl["auto_when"],
+                   folder=os.path.join(os.path.dirname(os.path.dirname(pl["path"])), a.new_name))
+    remove_playlist(pl)
+    print(f"Renamed '{pl['name']}' to '{a.new_name}'. " + MENU_NOTE.format(ns=NAMESPACE, name=a.new_name))
 
 
 def cmd_delete(a):
     pl = get_playlist(a.name)
-    os.remove(pl["path"])
-    print(f"Deleted '{pl['name']}' ({pl['path']}).")
-
-
-def cmd_save_session(a):
-    a.skills = session_skills(a.session, a.last)
-    if not a.skills:
-        raise PlaylistError("No skills were loaded in this session yet, so there is nothing to save.")
-    cmd_new(a)
+    remove_playlist(pl)
+    print(f"Deleted playlist '{pl['name']}' ({len(pl['skills'])} skills). "
+          f"It leaves the / menu from your next session. The skills themselves are untouched.")
 
 
 def cmd_suggest(a):
@@ -641,59 +579,88 @@ def cmd_doctor(a):
     for name, pl in sorted(all_playlists(problems=unreadable).items()):
         missing = [s for s in pl["skills"] if s not in index]
         problems += bool(missing)
+        skill_md = os.path.join(os.path.dirname(pl["path"]), "SKILL.md")
+        try:
+            with open(skill_md) as fh:
+                stale = fh.read() != render_skill(pl, index if pl["mode"] == "pick" else {})
+        except OSError:
+            stale = True
         print(f"{name}: {len(pl['skills']) - len(missing)}/{len(pl['skills'])} on disk" +
               (f"; not found: {', '.join(missing)}" if missing else "") +
-              (f"; {pl['rejected']} invalid entries ignored" if pl["rejected"] else ""))
+              (f"; {pl['rejected']} invalid entries ignored" if pl["rejected"] else "") +
+              ("; SKILL.md is out of date, run `sync`" if stale else ""))
     for p in unreadable:
         print(f"Skipped: {p}")
     print("\nNot-found skills may be built-in or synced from claude.ai. Anything else was renamed or uninstalled."
           if problems else "\nAll playlist skills are installed.")
 
 
+def cmd_sync(a):
+    """Regenerate every SKILL.md from its playlist.json, and bring over playlists saved by version 0.1."""
+    legacy = os.path.join(config_dir(), "playlists")
+    moved = 0
+    for path in sorted(glob.glob(os.path.join(legacy, "*.json"))):
+        name = os.path.basename(path)[:-5]
+        try:
+            with open(path) as fh:
+                old = json.load(fh)
+            if NAME_RE.match(name) and name not in all_playlists() and isinstance(old.get("skills"), list):
+                write_playlist(name, [s for s in old["skills"] if isinstance(s, str) and SKILL_RE.match(s)],
+                               old.get("description", ""))
+                os.remove(path)
+                moved += 1
+        except (OSError, ValueError, AttributeError, PlaylistError):
+            continue
+    if os.path.isdir(legacy) and not [f for f in os.listdir(legacy) if f != ".state.json"]:
+        shutil.rmtree(legacy)
+    lists = all_playlists()
+    for pl in lists.values():
+        write_playlist(pl["name"], pl["skills"], pl["description"], pl["mode"], pl["auto_when"],
+                       folder=os.path.dirname(pl["path"]))
+    print(f"Regenerated {len(lists)} playlist(s)" + (f", {moved} brought over from the old format." if moved else "."))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="playlists", description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("play", help="print the load text for one or more playlists (swift+db, swift:index)")
-    p.add_argument("ref", nargs="*")
-    p.set_defaults(fn=cmd_play)
-    sub.add_parser("catalog", help="print every playlist with its skills").set_defaults(fn=cmd_catalog)
     sub.add_parser("list", help="list playlists").set_defaults(fn=cmd_list)
-    p = sub.add_parser("show", help="show a playlist and whether each skill is installed")
+    p = sub.add_parser("show", help="show a playlist's skills and whether each is installed")
     p.add_argument("name")
     p.set_defaults(fn=cmd_show)
-    p = sub.add_parser("skills", help="search installed skills by word, to find ids for a playlist")
+    p = sub.add_parser("skills", help="search installed skills by word, to find exact ids")
     p.add_argument("query", nargs="*")
-    p.add_argument("--limit", type=int, default=40)
+    p.add_argument("--limit", type=int, default=25)
     p.set_defaults(fn=cmd_skills)
-    for name, fn in (("new", cmd_new), ("save-session", cmd_save_session)):
-        p = sub.add_parser(name)
-        p.add_argument("name")
-        if name == "new":
-            p.add_argument("skills", nargs="+")
-        else:
-            p.add_argument("--session", required=True, help="session id (${CLAUDE_SESSION_ID})")
-            p.add_argument("--last", type=int, help="only the last N turns that loaded skills")
-        p.add_argument("--description", "-d")
-        p.add_argument("--mode", choices=MODES, default="invoke")
-        p.add_argument("--project", action="store_true", help="save in this repo's .claude/playlists (shareable)")
-        p.add_argument("--force", action="store_true")
-        p.set_defaults(fn=fn)
+    p = sub.add_parser("new", help="create a playlist from named skills and/or this conversation's skills")
+    p.add_argument("name")
+    p.add_argument("skills", nargs="*")
+    p.add_argument("--session", help="capture the skills loaded in this session (${CLAUDE_SESSION_ID})")
+    p.add_argument("--last", type=int, help="with --session: only the last N turns that loaded skills")
+    p.add_argument("--description", "-d")
+    p.add_argument("--mode", choices=MODES, default="all")
+    p.add_argument("--project", action="store_true", help="save in this repo's .claude/skills/playlist (shareable)")
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(fn=cmd_new)
     for name in ("add", "remove"):
-        p = sub.add_parser(name)
+        p = sub.add_parser(name, help=f"{name} skills {'to' if name == 'add' else 'from'} a playlist")
         p.add_argument("name")
-        p.add_argument("skills", nargs="+")
+        p.add_argument("skills", nargs="*")
+        if name == "add":
+            p.add_argument("--session", help="add the skills loaded in this session")
         p.set_defaults(fn=cmd_edit)
-    p = sub.add_parser("set", help="change a playlist's description or default mode")
+    p = sub.add_parser("set", help="change a playlist's description, load mode or auto-load rule")
     p.add_argument("name")
     p.add_argument("--description", "-d")
-    p.add_argument("--mode", choices=MODES)
+    p.add_argument("--mode", choices=MODES, help="all: load every skill. pick: Claude loads only what the request needs")
+    p.add_argument("--auto", metavar="WHEN", help="let Claude load it unasked, e.g. 'working on Swift or SwiftUI code'")
+    p.add_argument("--no-auto", action="store_true")
     p.set_defaults(fn=cmd_set)
     p = sub.add_parser("rename")
     p.add_argument("name")
     p.add_argument("new_name")
     p.set_defaults(fn=cmd_rename)
-    p = sub.add_parser("delete")
+    p = sub.add_parser("delete", help="delete a playlist (never the skills in it)")
     p.add_argument("name")
     p.set_defaults(fn=cmd_delete)
     p = sub.add_parser("suggest", help="propose playlists from skills you repeatedly load together")
@@ -702,13 +669,12 @@ def main(argv=None):
     p.add_argument("--dismiss", nargs="+", metavar="N", help="never suggest these numbered candidates again")
     p.set_defaults(fn=cmd_suggest)
     sub.add_parser("doctor", help="check every playlist against installed skills").set_defaults(fn=cmd_doctor)
-    sub.add_parser("hook", help="UserPromptSubmit hook entry point").set_defaults(fn=lambda a: run_hook())
+    sub.add_parser("sync", help="regenerate every playlist's SKILL.md").set_defaults(fn=cmd_sync)
 
     args = ap.parse_args(argv)
     try:
         args.fn(args)
     except PlaylistError as e:
-        # Exit 0 on purpose: a non-zero exit inside `!` injection aborts the whole skill and hides this message.
         print(f"Playlist error: {e}")
 
 
