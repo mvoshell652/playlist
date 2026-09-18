@@ -25,7 +25,7 @@ Claude Code has no saved group of skills. Typing `/a /b /c` stacks six at most a
 ## Install
 
 ```
-git clone <repo-url> /tmp/playlist && sh /tmp/playlist/install.sh
+git clone https://github.com/mvoshell652/playlist /tmp/playlist && sh /tmp/playlist/install.sh
 ```
 
 This copies the tool into `~/.claude/skills/playlist/`. Run the same command again to update; your playlists are never touched. Start a new Claude Code session afterwards.
