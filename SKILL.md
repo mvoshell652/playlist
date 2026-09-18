@@ -1,8 +1,8 @@
 ---
-name: manage
-description: Create, edit, delete and view skill playlists through a short guided menu. A playlist is a named set of installed skills that loads from /playlist:<name>. Use when the user wants to make a playlist, add or remove skills from one, rename or delete one, see their playlists, or get playlist suggestions.
+name: playlist
+description: Create, edit, delete and view skill playlists through a short guided menu. A playlist is a named set of installed skills that loads together from /playlist:<name>. Use when the user wants to make a playlist, add or remove skills from one, rename or delete one, see their playlists, or get playlist suggestions.
 argument-hint: "[leave empty for the menu, or say what you want]"
-allowed-tools: Bash(sh "${CLAUDE_PLUGIN_ROOT}/bin/playlists" *), Bash(sh ${CLAUDE_PLUGIN_ROOT}/bin/playlists *)
+allowed-tools: Bash(sh "${CLAUDE_SKILL_DIR}/bin/playlist" *), Bash(sh ${CLAUDE_SKILL_DIR}/bin/playlist *)
 ---
 
 Manage the user's skill playlists by walking them through a short menu.
@@ -15,10 +15,11 @@ The user's input: $ARGUMENTS
 - AskUserQuestion limits: 2 to 4 options per question, at most 4 questions per call, headers of 12 characters or fewer. The user can always type their own answer under "Other", so never add an "Other" option yourself.
 - A question needs at least two real choices. When only one applies, do not ask: take it and say in one line what you did.
 - If the user's input already answers a step ("add swiftdata to swift"), skip that step. Ask only for what is still missing.
+- If the input is nothing but the name of an existing playlist, they want to play it. Run `show <name>`, which prints the playlist's folder, read the `SKILL.md` in that folder and follow it. Mention that `/playlist:<name>` does this directly.
 - If the user names a different playlist or changes their mind part way, treat that as a fresh answer to the step it belongs to and carry on from there.
 - Do the work with the bundled CLI, run through the Bash tool:
 
-      sh "${CLAUDE_PLUGIN_ROOT}/bin/playlists" <command>
+      sh "${CLAUDE_SKILL_DIR}/bin/playlist" <command>
 
 - Before the first question, run `list` so you know which playlists exist. Do not show its output unless the user asks to see their playlists.
 - If no playlists exist yet, say so in one line and go straight to **Create**.

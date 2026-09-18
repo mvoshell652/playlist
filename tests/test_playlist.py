@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-spec = importlib.util.spec_from_file_location("playlists", os.path.join(ROOT, "bin", "playlists.py"))
+spec = importlib.util.spec_from_file_location("playlists", os.path.join(ROOT, "bin", "playlist.py"))
 pl = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pl)
 
@@ -75,14 +75,35 @@ class SlashMenuTests(Sandbox):
             self.assertEqual(json.load(fh)["name"], "playlist")
         self.assertTrue(os.path.exists(os.path.join(self.home, "skills", "swift", "SKILL.md")))
 
-    def test_manifest_is_refreshed_when_this_tool_changes_it(self):
+    def test_an_existing_manifest_is_never_rewritten(self):
         self.run_cli("new", "swift", "a")
         path = os.path.join(self.home, ".claude-plugin", "plugin.json")
         with open(path, "w") as fh:
-            fh.write('{"name": "playlist", "description": "old"}')
+            fh.write('{"name": "playlist", "description": "shipped with the tool"}')
         self.run_cli("add", "swift", "b")
         with open(path) as fh:
-            self.assertIn("/playlists:manage", json.load(fh)["description"])
+            self.assertEqual(json.load(fh)["description"], "shipped with the tool")
+
+    def test_the_tool_itself_is_the_bare_command_and_never_says_playlists_colon(self):
+        with open(os.path.join(ROOT, ".claude-plugin", "plugin.json")) as fh:
+            self.assertEqual(json.load(fh)["name"], "playlist")
+        with open(os.path.join(ROOT, "SKILL.md")) as fh:
+            root_skill = fh.read()
+        self.assertIn("\nname: playlist\n", root_skill)
+        self.assertNotIn("CLAUDE_PLUGIN_ROOT", root_skill)  # the root skill's folder is the plugin folder
+        self.run_cli("new", "swift", "a")
+        for text in (root_skill, self.skill_md("swift"), self.run_cli("list"), self.run_cli("show", "swift")):
+            self.assertNotIn("/playlists", text)
+            self.assertNotIn("playlists:", text)
+
+    def test_the_root_skill_is_not_offered_as_a_skill_to_add(self):
+        os.makedirs(self.home, exist_ok=True)
+        with open(os.path.join(self.home, "SKILL.md"), "w") as fh:
+            fh.write("---\nname: playlist\ndescription: The menu.\n---\nbody")
+        skill(self.config, "real")
+        out = self.run_cli("skills")
+        self.assertIn("1 of 1 installed skills", out)
+        self.assertNotIn("The menu.", out)
 
     def test_generated_skill_has_valid_frontmatter_and_a_menu_description(self):
         self.run_cli("new", "swift", "a", "b", "-d", 'Full "Swift": pass')
@@ -341,7 +362,7 @@ class TranscriptTests(Sandbox):
         self.write_session("s1", [
             line("user", "load my swift skills"),
             skill_call("swiftui-pro"), skill_call("supabase:supabase"), skill_call("workflow-authoring"),
-            skill_call("playlist:db"), skill_call("playlists:add"),
+            skill_call("playlist:db"), skill_call("playlist"), skill_call("playlists:add"),
             line("user", [{"type": "tool_result", "content": "ok"}]),
             skill_call("swift-testing"),
             line("assistant", [{"type": "tool_use", "name": "Skill", "input": {"skill": "sub"}}], isSidechain=True),

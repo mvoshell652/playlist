@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Skill playlists for Claude Code: a named list of skills that one slash command loads.
 
-Every playlist is a real skill inside a skills-directory plugin named `playlist`:
+This whole tool is one skills-directory plugin named `playlist`:
 
     ~/.claude/skills/playlist/.claude-plugin/plugin.json
-    ~/.claude/skills/playlist/skills/<name>/playlist.json   the playlist (source of truth)
-    ~/.claude/skills/playlist/skills/<name>/SKILL.md        generated from it
+    ~/.claude/skills/playlist/SKILL.md                      /playlist: the guided create/edit/delete menu
+    ~/.claude/skills/playlist/bin/                          this CLI, which that menu calls
+    ~/.claude/skills/playlist/skills/<name>/playlist.json   a playlist (source of truth)
+    ~/.claude/skills/playlist/skills/<name>/SKILL.md        /playlist:<name>, generated from it
 
-People manage playlists through one guided command, /playlists:manage, which calls this CLI.
-
-Claude Code namespaces a plugin's skills by the plugin name, so typing `/playlist:`
-autocompletes to every playlist, exactly like any other command. The generated
+Claude Code registers a plugin's root skill under the plugin's bare name and its other
+skills as `name:skill`, so typing `/playlist` lists the menu and then every playlist. The generated
 SKILL.md is static text: no shell runs when a playlist is played.
 
 Standard library only, so the plugin has no install step. Anything read from a
@@ -71,20 +71,19 @@ def project_plugin_root(cwd=None):
 
 
 def ensure_manifest(root):
-    """The manifest is what makes the folder a plugin, and so what puts playlists under /playlist: in the menu."""
+    """A folder is only a plugin, and its playlists only appear under /playlist:, if it has a manifest.
+
+    The personal folder ships with one. A project folder gets a minimal one the first time a
+    playlist is shared into a repo. An existing manifest is never rewritten.
+    """
     path = os.path.join(root, ".claude-plugin", "plugin.json")
-    text = json.dumps({"name": NAMESPACE, "version": "1.0.0",
-                       "description": "Your skill playlists. Type /playlist: to pick one. "
-                                      "Create and edit them with /playlists:manage."}, indent=2) + "\n"
-    try:
-        with open(path) as fh:
-            if fh.read() == text:
-                return
-    except OSError:
-        pass
+    if os.path.exists(path):
+        return
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as fh:
-        fh.write(text)
+        json.dump({"name": NAMESPACE, "version": "1.0.0",
+                   "description": "Skill playlists shared with this project. Type /playlist: to pick one."}, fh, indent=2)
+        fh.write("\n")
 
 
 # ---------------------------------------------------------------- playlists
@@ -190,7 +189,7 @@ def render_skill(pl, index):
             f"3. When the calls return, start your reply with one line: `▶ {name} · <loaded>/{n} skills loaded`. Count a "
             f"skill as loaded only if its Skill call returned the skill's content, and name every skill whose call failed.")
     return ("---\n" + "\n".join(front) + "\n---\n\n"
-            "<!-- Generated from playlist.json by the playlists plugin. Change it with /playlists:manage; "
+            "<!-- Generated from playlist.json by the playlists plugin. Change it with /playlist; "
             "hand edits here are overwritten. -->\n\n"
             f"This is the \"{name}\" skill playlist: {n} skills that load together.\n\n{steps}\n"
             f"4. Then carry out the user's request with those skills applied. If the request below is empty, stop after step 3.\n\n"
@@ -278,6 +277,8 @@ def skill_index(cwd=None):
     index = {}
 
     def add(key, path, inside=None):
+        if key == NAMESPACE:  # this tool's own root skill, not something to put in a playlist
+            return
         if SKILL_RE.match(key) and key not in index and readable_skill_file(path, inside):
             index[key] = path
 
@@ -300,7 +301,7 @@ def skill_index(cwd=None):
         plugins = {}
     for key, installs in plugins.items() if isinstance(plugins, dict) else []:
         for inst in installs if isinstance(installs, list) else []:
-            if isinstance(inst, dict) and inst.get("installPath") and not key.startswith("playlists@"):
+            if isinstance(inst, dict) and inst.get("installPath"):
                 add_dir(os.path.join(inst["installPath"], "skills"), prefix=key.split("@")[0] + ":")
     return index
 
@@ -369,7 +370,7 @@ def clean(skills):
     """Drop harness-loaded skills, playlists and our own commands; keep exact ids in first-use order."""
     out = []
     for s in skills:
-        ours = s.startswith(("playlists:", NAMESPACE + ":"))
+        ours = s == NAMESPACE or s.startswith((NAMESPACE + ":", "playlists:"))
         if canonical(s) not in HARNESS_SKILLS and not ours and s not in out:
             out.append(s)
     return out
@@ -639,7 +640,7 @@ def cmd_sync(a):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="playlists", description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(prog="playlist", description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="command", required=True)
 
     sub.add_parser("list", help="list playlists").set_defaults(fn=cmd_list)
