@@ -46,15 +46,31 @@ A plugin that sits in your skills directory is loaded in place, keeps its files,
 
 ## Create and edit playlists
 
-Run `/playlist` with nothing after it. It walks you through a short menu using Claude's own question panel, so you pick instead of type:
+Run `/playlist` with nothing after it. It walks you through five short steps in Claude's own question panel, so you pick instead of type. Every option says what it will do and what it is based on.
 
-1. **What do you want to do?** Create a playlist, edit one, delete one, or see your playlists.
-2. **What should we call it?** A few suggested names, or type your own.
-3. **Which skills do you want in it?** You never search one word at a time:
-   - **Type them all on one line.** Names, partial names or a description: `nuxt vue pinia shadcn vitest a11y`, or "everything for a Nuxt app with Pinia and testing". Claude resolves every word in one pass.
-   - **Suggest for this project.** Claude reads the project's dependency files and proposes the installed skills that fit the stack.
-   - **From this conversation**, or **from your history** of skills you often load together.
-4. **Review one list.** Claude shows what it gathered, marks the places where it chose between similar skills so you can swap them, and asks only about genuine toss-ups. Create it, add more, or remove some.
+**1. Choose what to do.** Create a playlist, edit one, delete one, or see what you have.
+
+<img src="docs/step-1-action.png" width="620" alt="Question panel: What do you want to do with your skill playlists? Options: Create a playlist, Edit a playlist, Delete a playlist, See my playlists. Each has a one line explanation, and two of them show how many playlists you have.">
+
+**2. Name it.** The name becomes the command: a playlist called `testing` is played with `/playlist:testing`. Claude suggests names from the folder you are in and from the conversation, each with the purpose it would serve, or you type your own.
+
+<img src="docs/step-2-name.png" width="620" alt="Question panel: What do you want to call this playlist? Suggested names are deploy, testing and review, each described by what it is for, plus a field to type your own.">
+
+**3. Choose the skills.** You never search one word at a time:
+
+- **Suggest from this folder.** Claude reads the dependency and config files in the folder you are in, such as `package.json`, and proposes the installed skills that fit. Nothing is changed.
+- **I'll type them.** Names, partial names or a description, all on one line: `nuxt vue pinia shadcn vitest a11y`, or "everything for a Nuxt app with Pinia and testing". Claude resolves every word in one pass.
+- **From this conversation**, when skills are already loaded, or **from my history**: lists of skills you have loaded together before, found in your past Claude Code conversations on your computer. Nothing leaves your machine.
+
+<img src="docs/step-3-skills.png" width="620" alt="Question panel: How do you want to choose the skills for testing? Options: Suggest from this folder, which names the folder and the stack it found; I'll type them, with an example; From my history, which says how many lists it found.">
+
+**4. Review one list.** Claude shows what it gathered with a few words on each skill, marks the places where it chose between similar skills so you can swap them, and tells you roughly how many tokens playing the list adds to a conversation. Create it, add more, remove some, or start over.
+
+<img src="docs/step-4-review.png" width="620" alt="Question panel: Create /playlist:testing with these 8 skills? Options: Create it, Add more skills, Remove some, Start over. Each says what happens, and Start over says the name stays.">
+
+**5. Play it now, or finish.** Playing loads the new playlist's skills into the conversation straight away.
+
+<img src="docs/step-5-next.png" width="620" alt="Question panel: /playlist:testing is ready. What next? Play it now loads its 8 skills into this conversation, about 13,200 tokens. Done finishes, and says you can play it later with /playlist:testing.">
 
 Editing offers add skills, remove skills, rename and change description. Deleting always asks first, and never touches the skills themselves.
 
@@ -66,7 +82,7 @@ If you already know what you want, say it and the menu skips ahead:
 /playlist delete review
 ```
 
-Adding or removing a skill takes effect in the current session. When you create a playlist, the menu ends by offering to **play it now**, which loads its skills into the conversation straight away. To see a new or renamed playlist in the `/` menu without waiting for your next session, type `/reload-plugins`; Claude Code reserves that command for you, so the tool cannot run it on your behalf.
+Adding or removing a skill takes effect in the current session. To see a new or renamed playlist in the `/` menu without waiting for your next session, type `/reload-plugins`; Claude Code reserves that command for you, so the tool cannot run it on your behalf.
 
 ## Options
 

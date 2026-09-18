@@ -48,6 +48,8 @@ Words to use, and to avoid:
 | this folder (`<folder>`) | project, repo, workspace, directory | Where suggestions are read from |
 | slash menu | autocomplete, dropdown, command list | The list that opens when you type `/` |
 
+On a panel, write a plugin skill's name once: `mutation-testing`, not `mutation-testing:mutation-testing`. Commands still take the exact id.
+
 Write "1 skill" and "12 skills". No "we", "please", "simply", "just" or "right away". No dashes and no exclamation marks. Sentence case.
 
 ## Text the user types (read before building any command)
