@@ -225,6 +225,10 @@ sh bin/playlist --help
 
 `PLAYLISTS_HOME` and `CLAUDE_CONFIG_DIR` redirect where playlists and skills are looked up, which keeps experiments away from your real `~/.claude`.
 
+## How it was built
+
+[docs/how-playlist-was-built.md](docs/how-playlist-was-built.md) records the day this tool was designed: the complaint that started it, each direction that was rejected and why, the mechanics of Claude Code that shaped it, and what is still open.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
