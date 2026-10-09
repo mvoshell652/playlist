@@ -38,34 +38,26 @@ It installs with a small script, not /plugin install. The README explains why: a
 
 # LinkedIn follow-up: the desktop app warning
 
-Drafted 9 October, 1,068 characters, link kept for the first comment. Image: `docs/desktop-warning.png`, padded to 1200x627.
+Drafted 9 October, 793 characters, link kept for the first comment. Image: `docs/desktop-warning.png`, padded to 1200x627.
 
 ```
-I tried to load two skills at once in the Claude Code desktop app today. It refused to send my message.
+Start a message in the Claude Code desktop app with two skills, like /swiftui-pro /swift-testing, and you get this. Nothing sends.
 
-That is the warning in the image. Once a message starts with a slash command, it cannot contain a second one.
+The desktop app won't take a second slash command once a message starts with one. In the terminal you can stack about six. Neither remembers which skills you used, so you retype them every session.
 
-Which is funny, because that is the exact problem I built Playlist to solve.
+The banner says to remove them. Playlist, which I open-sourced three weeks ago, lets you keep them.
 
-If you use Claude Code with a lot of skills, you know the routine. Every session starts with the same list. The terminal stacks about six skills per message. The desktop app refuses a second one. Neither saves the list for next time.
+You group your skills under one name once. My /playlist:swift loads 20, and since it's a single slash command, the desktop app sends it. It shows up in the normal slash menu and works in the terminal and IDE extensions too.
 
-Playlist turns the list into one command.
+Free and MIT licensed. Repo's in the first comment.
 
-Group your skills under a name once. Then type /playlist:swift and all 20 load. It is a single slash command, so the desktop app sends it. Claude tells you how many skills loaded and gets on with your request.
+Do you keep a fixed set of skills per project, or pick them per task?
 
-→ It shows up in the normal slash menu. No new syntax.
-→ It works in the desktop app, the terminal and the IDE extensions.
-→ Free and MIT licensed.
-
-Link in the comments.
-
-How many skills do you load before you start real work?
-
-#ClaudeCode #AIAgents #DeveloperTools #OpenSource
+#ClaudeCode
 ```
 
 First comment:
 
 ```
-Repo and the one-line install: https://github.com/mvoshell652/playlist
+Playlist repo: https://github.com/mvoshell652/playlist. Install steps are in the README.
 ```
