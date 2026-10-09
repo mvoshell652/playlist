@@ -34,3 +34,38 @@ Repo and the one-line install: https://github.com/mvoshell652/playlist
 
 It installs with a small script, not /plugin install. The README explains why: a marketplace install cannot register the bare /playlist command and would wipe your playlists on every update.
 ```
+
+
+# LinkedIn follow-up: the desktop app warning
+
+Drafted 9 October, 1,068 characters, link kept for the first comment. Image: `docs/desktop-warning.png`, padded to 1200x627.
+
+```
+I tried to load two skills at once in the Claude Code desktop app today. It refused to send my message.
+
+That is the warning in the image. Once a message starts with a slash command, it cannot contain a second one.
+
+Which is funny, because that is the exact problem I built Playlist to solve.
+
+If you use Claude Code with a lot of skills, you know the routine. Every session starts with the same list. The terminal stacks about six skills per message. The desktop app refuses a second one. Neither saves the list for next time.
+
+Playlist turns the list into one command.
+
+Group your skills under a name once. Then type /playlist:swift and all 20 load. It is a single slash command, so the desktop app sends it. Claude tells you how many skills loaded and gets on with your request.
+
+→ It shows up in the normal slash menu. No new syntax.
+→ It works in the desktop app, the terminal and the IDE extensions.
+→ Free and MIT licensed.
+
+Link in the comments.
+
+How many skills do you load before you start real work?
+
+#ClaudeCode #AIAgents #DeveloperTools #OpenSource
+```
+
+First comment:
+
+```
+Repo and the one-line install: https://github.com/mvoshell652/playlist
+```
