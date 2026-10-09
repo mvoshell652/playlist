@@ -4,6 +4,12 @@
 
 Playlist for Claude Code allows you to group any of your installed skills under one name, then load them all from the slash menu.
 
+**One command for many skills.** In the Claude Code desktop app, a message that starts with a slash command cannot contain a second one. Type `/swiftui-pro /swift-testing review LoginView` and nothing is sent:
+
+<img src="docs/desktop-warning.png" width="460" alt="Claude desktop app warning: A command takes file @-mentions but no other @-mentions, slash commands, links, or inline formatting, so nothing was sent. Remove them.">
+
+A playlist is one slash command, so `/playlist:swift` goes through and loads all 20 of its skills.
+
 Type `/playlist` and the menu shows the tool, then every playlist you have. Hover over one to see what is in it:
 
 <img src="docs/menu.png" width="760" alt="Claude Code's slash menu after typing /playlist. It lists playlist, playlist:db, playlist:swift and four more. The hover text for playlist:swift reads: Full Swift and SwiftUI pass. 20 skills, followed by every skill grouped under SWIFTUI and SWIFT.">
@@ -20,7 +26,7 @@ Claude says how many skills it is loading, loads every one in parallel, confirms
 
 ## Why
 
-Claude Code has no saved group of skills. Typing `/a /b /c` stacks six at most and nothing is remembered, so people paste the same "load these 20 skills" list over and over. A playlist is that list, saved once and one tab away.
+Claude Code has no saved group of skills. Typing `/a /b /c` stacks about six in the terminal and sends nothing in the desktop app, so people paste the same "load these 20 skills" list over and over. A playlist is that list, saved once and one tab away.
 
 ## Install
 
@@ -191,6 +197,7 @@ The hover text is built from these: the description, the skill count, then every
 | The hover text is out of date | The same. Claude Code reads it when plugins load |
 | A skill is reported as not loaded | Run `/playlist check my playlists`. The skill was probably renamed or uninstalled |
 | "not found on disk" beside a skill | Built-in skills and skills synced from claude.ai are never on disk, so this is normal for them. For anything else, check the spelling with `skills <word>` |
+| The desktop app says "A command takes file @-mentions but no other..." and sends nothing | The message starts with a slash command and also has a second one, a link, an @-mention that is not a file, or inline formatting. Remove those. A playlist command on its own is fine |
 | "Python 3.8 or newer was not found" | Install Python and make sure `python3`, `python` or `py` is on PATH |
 
 ## How it works
