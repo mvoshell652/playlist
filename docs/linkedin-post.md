@@ -38,18 +38,18 @@ It installs with a small script, not /plugin install. The README explains why: a
 
 # LinkedIn follow-up: the desktop app warning
 
-Drafted 9 October, 793 characters, link kept for the first comment. Image: `docs/desktop-warning.png`, padded to 1200x627.
+Drafted 9 October, 752 characters, link kept for the first comment. Image: `docs/desktop-warning.png`, padded to 1200x627.
 
 ```
-Start a message in the Claude Code desktop app with two skills, like /swiftui-pro /swift-testing, and you get this. Nothing sends.
+Type /swiftui-pro /swift-testing at the start of a message in the Claude Code desktop app and you get this. Nothing sends.
 
-The desktop app won't take a second slash command once a message starts with one. In the terminal you can stack about six. Neither remembers which skills you used, so you retype them every session.
+My Swift work uses 20 skills. The terminal tops out at about six per message. Nothing saves the list, so I retype it every session.
 
-The banner says to remove them. Playlist, which I open-sourced three weeks ago, lets you keep them.
+The banner says "Remove them." I'd rather keep my skills, so I built Playlist.
 
-You group your skills under one name once. My /playlist:swift loads 20, and since it's a single slash command, the desktop app sends it. It shows up in the normal slash menu and works in the terminal and IDE extensions too.
+I open-sourced it three weeks ago. I saved mine as a playlist called swift, and /playlist:swift loads all 20 at once. It's a single slash command, so the desktop app sends it. Your playlists sit in the normal slash menu and work in the terminal and IDE extensions too.
 
-Free and MIT licensed. Repo's in the first comment.
+MIT licensed, one-line install. Repo's in the first comment.
 
 Do you keep a fixed set of skills per project, or pick them per task?
 
