@@ -2,13 +2,7 @@
 
 [![tests](https://github.com/mvoshell652/playlist/actions/workflows/ci.yml/badge.svg)](https://github.com/mvoshell652/playlist/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Playlist for Claude Code allows you to group any of your installed skills under one name, then load them all from the slash menu.
-
-**One command for many skills.** In the Claude Code desktop app, a message that starts with a slash command cannot contain a second one. Type `/swiftui-pro /swift-testing review LoginView` and nothing is sent:
-
-<img src="docs/desktop-warning.png" width="460" alt="Claude desktop app warning: A command takes file @-mentions but no other @-mentions, slash commands, links, or inline formatting, so nothing was sent. Remove them.">
-
-A playlist is one slash command, so `/playlist:swift` goes through and loads all 20 of its skills.
+Playlist for Claude Code allows you to group any of your installed skills under one name, then load them all from the slash menu. A playlist is a single slash command, so `/playlist:swift` goes through and loads all 20 of your skills.
 
 Type `/playlist` and the menu shows the tool, then every playlist you have. Hover over one to see what is in it:
 
