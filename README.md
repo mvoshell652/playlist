@@ -4,6 +4,8 @@
 
 Playlist for Claude Code allows you to group any of your installed skills under one name, then load them all from the slash menu. A playlist is a single slash command, so `/playlist:swift` goes through and loads all 20 of your skills.
 
+https://github.com/user-attachments/assets/07760dd7-1aa2-487d-9554-0d6a60364512
+
 Type `/playlist` and the menu shows the tool, then every playlist you have. Hover over one to see what is in it:
 
 <img src="docs/menu.png" width="760" alt="Claude Code's slash menu after typing /playlist. It lists playlist, playlist:db, playlist:swift and four more. The hover text for playlist:swift reads: Full Swift and SwiftUI pass. 20 skills, followed by every skill grouped under SWIFTUI and SWIFT.">
